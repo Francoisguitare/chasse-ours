@@ -1,7 +1,7 @@
 /* Chassé d'Ours — duel à deux (ou plus) dans les ruines : chacun voit l'autre, sauf s'il se cache. */
 const Duel = (() => {
   'use strict';
-  let G, lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
+  let G, myName = 'Promeneur', lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
   const GOAL = 5, others = new Map(), $ = id => document.getElementById(id);
   const ARENA = { x: 10, z: -95, r: 54 };
   const SPAWNS = [[10, -66], [21, -119], [-4, -96], [20.5, -82]];
@@ -50,7 +50,7 @@ const Duel = (() => {
     others.set(id, o); $('invite').hidden = true;
     if (World.broken.length) Net.send({ t: 'brks', l: World.broken.slice(-500).map(b => [b[0], b[1], r2(b[2]), r2(b[3])]) });   // le nouveau venu rattrape ce qui est déjà cassé
     if (failed) { failed = false; G.dismissCard(); }   // la liaison a fini par s'établir : on retire le message d'échec
-    G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points. Par surprise, ça compte double.</small>`, 'red', 4200); Snd.alert();
+    G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3000); Snd.alert();
     return o;
   }
   function drop(id) { for (const o of [...others.values()]) if (id === null || o.id === id || (!Net.isHost && id !== undefined)) { G.scene.remove(o.model.root); others.delete(o.id); } scoreKey = ''; }
@@ -62,6 +62,7 @@ const Duel = (() => {
       const o = others.get(d.id) || add(d.id, d), now = performance.now(), gap = Math.max(0.03, (now - o.seen) / 1000);
       o.v = Math.hypot(d.x - o.tx, d.z - o.tz) / gap; o.seen = now; o.tx = d.x; o.ty = d.y; o.tz = d.z; o.tf = d.f;
       o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0; o.hp = num(d.hp) ? U.clamp(d.hp, 0, 100) : 100;
+      if (typeof d.n === 'string') { const nm = d.n.replace(/[\u0000-\u001f]/g, '').slice(0, 14).trim(); if (nm && nm !== o.name) { const first = !o.name; o.name = nm; scoreKey = ''; if (first) G.banner(`${nm} entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3600); } }
       if (num(d.tp) && d.tp !== o.tp) { if (o.tp !== undefined) { FX.tpOut(o.x, o.y, o.z); o.x = d.x; o.y = d.y; o.z = d.z; o.f = d.f; FX.tpIn(o.x, o.y, o.z); Snd.teleport(); } o.tp = d.tp; }
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; G.whenCalm(() => endCard(false)); }
@@ -82,7 +83,7 @@ const Duel = (() => {
     sendAcc += rdt;
     if (sendAcc > 0.066) {
       sendAcc = 0;
-      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp) });
+      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp), n: myName });
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
@@ -104,7 +105,7 @@ const Duel = (() => {
     refresh();
   }
   function best() { let b = null; for (const o of others.values()) if (!b || o.sc > b.sc) b = o; return b; }
-  function line() { const b = best(); return b ? `Toi ${score} · ${b.sc} Adversaire` : 'En attente d\'un adversaire'; }
+  function line() { const b = best(); return b ? `${myName} ${score} · ${b.sc} ${b.name || 'Adversaire'}` : 'En attente d\'un adversaire'; }
   function refresh() { const t = line(); if (t !== scoreKey) { scoreKey = t; $('duel-score').textContent = t; } }
   const hud = () => ({ eyebrow: `Duel · premier à ${GOAL}`, text: line(), k: score / GOAL });
 
@@ -114,8 +115,15 @@ const Duel = (() => {
     for (const o of others.values()) {
       if (o.fl || o.inv || Math.hypot(o.x - fx, o.z - fz) > 1.5 || Math.abs(o.y - G.P.y) > 2.8) continue;
       const S = G.S, back = Math.sin(o.f) * k.dx + Math.cos(o.f) * k.dz > 0.45, launch = k.c >= 0.5 || k.mega, sneaky = k.ambush || back;
-      const dmg = k.mega ? 999 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1));
-      const tags = []; if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
+      const lite = k.combo && k.combo < 4;
+      if (lite) {   // coup de combo : peu de dégâts, mais la cible est bloquée tant que ça enchaîne
+        const dm = 7; G.comboFx(o.x, o.z, k);
+        Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: 0, launch: false, mega: false, dmg: dm, stun: 0.7 });
+        S.fury = Math.min(100, S.fury + 4); G.showHit('Combo ' + k.combo, 'soft', ['−' + dm]).verdict.textContent = k.combo === 3 ? 'Encore un : le final' : 'Enchaîne !';
+        return true;
+      }
+      const dmg = k.mega ? 999 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1) * (k.combo === 4 ? 1.3 : 1));
+      const tags = []; if (k.combo === 4) tags.push('Fin de combo'); if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
       G.impactFX(dummy(o.x, o.z), k, U.clamp(0.4 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0), 0.3, 1.6), !!k.mega, launch);
       Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega, dmg });
       if (k.mega) { S.fury = 0; G.fireRay(o.x, o.y + 1.2, o.z, k.dx, k.dz); }
@@ -132,7 +140,7 @@ const Duel = (() => {
     const a = others.get(d.id);
     if (a && G.tryDodge({ x: a.x, z: a.z, f: a.f, rad: 0.6 })) { Net.send({ t: 'dodge', id: Net.id(), to: d.id }); return; }
     G.stopCharge(); P.kick = null;
-    G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
+    if (num(d.stun)) G.comboFx(P.x, P.z, { dx, dz, combo: 2 }); else G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
     const el = $('hurt'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
     if (d.mega) G.fireRay(P.x, (P.y || 0) + 1.2, P.z, dx, dz, true);
     const S = G.S; S.hp = d.mega ? 0 : Math.max(0, S.hp - (num(d.dmg) ? U.clamp(d.dmg, 0, 999) : 20));
@@ -143,6 +151,9 @@ const Duel = (() => {
     } else if (d.launch) {   // projeté mais debout : Téléport pendant le vol pour contre-attaquer
       P.fly = { t: 0, vx: dx * 17, vz: dz * 17, vy: 12, by: d.id }; P.crouch = false; $('t-crouch').classList.remove('on');
       G.showHit('Projeté', 'soft', ['−' + Math.round(d.dmg || 0)]).verdict.textContent = 'Téléport pour revenir dans son dos';
+    } else if (num(d.stun)) {   // pris dans un combo : impossible de bouger ou de frapper. Seul Téléport en sort.
+      P.vx = dx * 4; P.vz = dz * 4; P.hurtT = U.clamp(d.stun, 0, 1);
+      G.showHit('Combo subi', 'soft', ['−' + Math.round(d.dmg || 0)]).verdict.textContent = 'Téléport pour t\'en sortir';
     } else { P.vx = dx * 13; P.vz = dz * 13; P.hurtT = 0.4; }
   }
   // le vol plané de celui qui vient d'en prendre un
@@ -172,7 +183,7 @@ const Duel = (() => {
       if (!o.vis) continue;
       const p = G.project(o.x, o.y + 2.9, o.z);
       if (p.on) {
-        g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; g.strokeText('ADVERSAIRE', p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText('ADVERSAIRE', p.x, p.y);
+        g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; const lab = (o.name || 'Adversaire').toUpperCase(); g.strokeText(lab, p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText(lab, p.x, p.y);
         const hp = o.hp === undefined ? 100 : o.hp, bw = 56; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(p.x - bw / 2 - 1, p.y + 9, bw + 2, 7); g.fillStyle = hp > 30 ? '#7fd85a' : '#ff4f3a'; g.fillRect(p.x - bw / 2, p.y + 10, bw * hp / 100, 5);
       }
     }
@@ -180,6 +191,7 @@ const Duel = (() => {
 
   // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
   function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
+  function setName(n) { myName = n; scoreKey = ''; }
   function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
-  return { init, start, update, hud, kickTest, threat, nearest, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
+  return { init, start, update, hud, kickTest, threat, nearest, setName, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
 })();

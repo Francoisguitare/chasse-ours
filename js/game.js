@@ -63,7 +63,7 @@
     hearts: 4, maxHearts: 4, stamina: 100, maxStamina: 100, winded: false, fury: 0, combo: 0, comboT: 0,
     power: 100, detectMul: 1, chargeRate: 1, furyMul: 1, reachMul: 1, mood: 'calm', pendingLevel: 0, timers: [], calmQ: [], counter: null, spawnT: 0, hintStep: 0, hintT: 0, moteAcc: 0, objT: 0, nearBear: false, fireAcc: 0,
   };
-  const P = { x: 0, y: 0, z: 6, vy: 0, tpWin: 0, tpRecent: 0, tpN: 0, focusing: false, focusAcc: 0, ground: true, climb: false, jumpBuf: 0, coyote: 0, jumps: 0, cut: true, fullT: 0, fly: null, vx: 0, vz: 0, face: Math.PI, crouch: false, crouchK: 0, charging: false, chargeT: 0, chargePose: 0, kickPose: 0, kick: null, recover: 0, hurtT: 0, invuln: 0, inGrass: false, hidden: false, sprinting: false, sprintK: 0, sprintT: 0, speed: 0, stepAcc: 0, regenDelay: 0, fullPing: false, auraAcc: 0 };
+  const P = { x: 0, y: 0, z: 6, vy: 0, tpWin: 0, tpRecent: 0, tpN: 0, tapBuf: 0, comboN: 0, comboWin: 0, tpComboT: 0, focusing: false, focusAcc: 0, ground: true, climb: false, jumpBuf: 0, coyote: 0, jumps: 0, cut: true, fullT: 0, fly: null, vx: 0, vz: 0, face: Math.PI, crouch: false, crouchK: 0, charging: false, chargeT: 0, chargePose: 0, kickPose: 0, kick: null, recover: 0, hurtT: 0, invuln: 0, inGrass: false, hidden: false, sprinting: false, sprintK: 0, sprintT: 0, speed: 0, stepAcc: 0, regenDelay: 0, fullPing: false, auraAcc: 0 };
   const I = { sx: 0, sz: 0, kick: false, focus: false, stick: false, full: false, jumpHeld: false };
   const keys = {};
   const bears = [];
@@ -98,13 +98,15 @@
 
   /* ---------- entrées ---------- */
   const playing = () => S.running && !S.paused && !S.modal;
-  function kickDown() { if (playing()) I.kick = true; }
+  // chaque appui est mémorisé un court instant : des appuis rapprochés enchaînent le combo même pendant le coup précédent
+  function kickDown() { if (playing()) { I.kick = true; P.tapBuf = 0.35; } }
   function kickUp() { I.kick = false; }
   function jumpDown() { if (playing()) { P.jumpBuf = 0.15; I.jumpHeld = true; } }
   function jumpUp() { I.jumpHeld = false; }
   function toggleCrouch() { if (!playing() || P.kick || P.hurtT > 0) return; P.crouch = !P.crouch; $('t-crouch').classList.toggle('on', P.crouch); }
   function look(dx, dy) { if (!playing()) return; cam.yaw -= dx * 0.0062; cam.pitch = clamp(cam.pitch + dy * 0.0045, 0.1, 1.25); }
   addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT') return;   // on tape son nom : le jeu n'écoute pas
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     if (!$('card').hidden) { if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) $('card-btn').click(); return; }
     if (S.modal && !$('levelup').hidden && /^(Digit|Numpad)[1-3]$/.test(e.code)) { const b = $('lu-perks').children[+e.code.slice(-1) - 1]; if (b) b.click(); return; }
@@ -484,17 +486,22 @@
     return best;
   }
   function startKick() {
+    // appui bref = coup de combo ; le 4e enchaîné est un final qui projette
+    const quick = P.chargeT < 0.22, combo = quick ? (P.comboWin > 0 ? Math.min(4, P.comboN + 1) : 1) : 0; P.comboN = combo; P.comboWin = 0;
+    if (combo === 4) P.chargeT = Math.max(P.chargeT, 0.9 * CFG.chargeTime);
     const c = Math.min(1, P.chargeT / CFG.chargeTime), perfect = P.chargeT >= CFG.chargeTime && P.chargeT <= CFG.chargeTime + CFG.perfectWin;
     P.charging = false; P.fullPing = false; Snd.chargeStop();
     // depuis un perchoir, le chassé devient plongeant : plus d'allonge, et on tombe sur la cible
-    const dive = P.y > 1.2, dur = CFG.lungeDur + (dive ? Math.min(0.3, P.y / 28) : 0), tg = pickTarget(kickReach(c) * (dive ? 1.5 : 1));
-    let reach = kickReach(c) * (dive ? 1.5 : 1);
+    const dive = P.y > 1.2 && !combo, dur = (combo && combo < 4 ? 0.11 : CFG.lungeDur) + (dive ? Math.min(0.3, P.y / 28) : 0), tg = pickTarget(Math.max(kickReach(c), combo ? 2.6 : 0) * (dive ? 1.5 : 1));
+    let reach = Math.max(kickReach(c), combo ? 2.6 : 0) * (dive ? 1.5 : 1);
+    if (tg && combo) reach = clamp(Math.hypot(tg.x - P.x, tg.z - P.z) - (tg.rad || 0.6) - 0.3, 0.4, reach);   // en combo on colle à la cible
     if (tg) { P.face = Math.atan2(tg.x - P.x, tg.z - P.z); if (dive) reach = clamp(Math.hypot(tg.x - P.x, tg.z - P.z) - 1.2, 1, reach); }   // en plongeant, on atterrit sur la cible
     const ambush = P.inGrass && P.crouch;
     P.crouch = false; $('t-crouch').classList.remove('on');
-    P.kick = { t: 0, dur, c, perfect, dx: Math.sin(P.face), dz: Math.cos(P.face), reach, hit: false, ambush, mega: S.fury >= 100, dive, y0: P.y };
+    P.kick = { t: 0, dur, c, perfect, dx: Math.sin(P.face), dz: Math.cos(P.face), reach, hit: false, ambush, mega: S.fury >= 100 && (!combo || combo === 4), dive, y0: P.y, combo };
     P.climb = false;
-    Snd.whoosh(0.5 + 0.5 * c);
+    Snd.whoosh(combo && combo < 4 ? 0.35 : 0.5 + 0.5 * c);
+    if (combo && combo < 4) P.kickSide = !P.kickSide;
   }
   function updateKick(dt) {
     const k = P.kick; k.t += dt;
@@ -507,7 +514,11 @@
       if (!k.hit) { const th = World.hitScenery(fx, fz, P.y); if (th) { k.hit = true; P.vx = P.vz = 0; kickScenery(th, k); } }
       if (dt > 0) FX.puff(P.x, P.y + 0.3, P.z, 1, 0.8);
     } else { const dr = Math.exp(-16 * dt); P.vx *= dr; P.vz *= dr; }
-    if (k.t > k.dur + (k.hit ? 0.24 : 0.12)) { P.kick = null; P.recover = k.hit ? 0.16 : 0.42; if (!k.hit) Snd.miss(); }
+    const lite = k.combo && k.combo < 4;
+    if (k.t > k.dur + (lite ? (k.hit ? 0.07 : 0.1) : k.hit ? 0.24 : 0.12)) {
+      P.kick = null; P.recover = lite ? (k.hit ? 0.02 : 0.25) : k.hit ? 0.16 : 0.42; if (!k.hit) Snd.miss();
+      if (lite && k.hit) { P.comboWin = 0.6; if (P.tpComboT > 0) P.tpComboT = Math.max(P.tpComboT, 0.9); } else P.comboN = 0;
+    }
   }
   // tout ce qui donne le poids du coup : arrêt sur image, ralenti, onde, lumière, arbres secoués
   function impactFX(b, k, heavy, mega, launch) {
@@ -565,6 +576,7 @@
   const TP_COST = 25;
   function tpDown() {
     if (!playing() || (P.fly && P.fly.ko)) return;
+    if (P.tpComboT > 0 && !P.fly) { kickDown(); return; }   // juste après une téléportation, le bouton enchaîne le combo
     if (S.fury < TP_COST) { banner('Pas assez de Furie<small>La téléportation coûte ' + TP_COST + ' %</small>', 'red', 1500); Snd.miss(); return; }
     // la cible : l'adversaire en duel, sinon l'ours le plus proche, où qu'il soit sur la carte
     let th = null;
@@ -575,7 +587,7 @@
     I.kick = true; P.recover = 0;   // on arrive en position de chassé : tant que le bouton reste enfoncé, on arme
   }
   function teleportBehind(t) {
-    S.fury = Math.max(0, S.fury - TP_COST); P.tpWin = 0; P.tpRecent = 0.4; P.tpN = (P.tpN || 0) + 1; P.fly = null; pm.pose.rotation.x = 0;
+    S.fury = Math.max(0, S.fury - TP_COST); P.tpWin = 0; P.tpRecent = 0.4; P.tpComboT = 1.4; P.comboN = 0; P.tapBuf = 0; P.tpN = (P.tpN || 0) + 1; P.fly = null; pm.pose.rotation.x = 0;
     FX.tpOut(P.x, P.y, P.z);
     const back = t.rad + 1.7; P.x = t.x - Math.sin(t.f) * back; P.z = t.z - Math.cos(t.f) * back; collide(P, 0.45, 0);
     P.y = World.groundAt(P.x, P.z, 6); P.vy = 0; P.vx = P.vz = 0; P.face = t.f; P.hurtT = 0; P.kick = null; stopCharge(); P.invuln = Math.max(P.invuln, 0.7); P.ground = true; P.climb = false;
@@ -599,6 +611,7 @@
   function onKickHit(b, k) {
     P.vx = P.vz = 0;
     const unaware = b.state === 'idle' || b.state === 'wander' || b.state === 'sleep';
+    if (k.combo && k.combo < 4) { comboHit(b, k, unaware); return; }
     if (b.T.boss) { bossHit(b, k); return; }
     if (b.T.guard && !unaware && !k.mega) { parry(b, k, 'Une Sentinelle ne s\'envoie que par surprise'); return; }
     const tags = []; let mult = 1;
@@ -611,6 +624,7 @@
     if (k.perfect) { mult *= 1.3; tags.push('Armé parfait ×1,3'); }
     if (k.dive) { mult *= 1.5; tags.push('Plongeant ×1,5'); }
     if (k.mega) { mult *= 2.5; tags.push('Furie ×2,5'); S.fury = 0; }
+    if (k.combo === 4) { mult *= 1.4; tags.push('Fin de combo ×1,4'); }
     const impulse = S.power * (0.3 + 0.7 * k.c) * mult, r = impulse / b.res, launch = r >= 1;
     const heavy = clamp(0.3 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0) + tags.length * 0.04, 0.3, 1.6);
     const { ix, iz } = impactFX(b, k, heavy, k.mega, launch);
@@ -625,6 +639,20 @@
     if (k.mega) megaWave(ix, iz, b);
   }
   // le Baron : seulement quand il est sonné (ou avec la Furie), et il en faut trois
+  // coup de combo : petit, sec, et l'ours reste sonné tant que ça enchaîne
+  function comboHit(b, k, unaware) {
+    if (b.T.guard && !unaware && b.state !== 'stunned') { parry(b, k, 'Une Sentinelle ne s\'envoie que par surprise'); return; }
+    if (b.T.boss && !b.vuln) { parry(b, k, 'Il pare tout tant qu\'il n\'est pas sonné'); return; }
+    S.hitstop = 0.045; S.slowLaunch = false; S.slowDur = 0; S.slowT = 1;
+    const ix = b.x - k.dx * b.rad * 0.6, iz = b.z - k.dz * b.rad * 0.6;
+    FX.sparks(ix, 1.2 * b.size, iz, k.dx, k.dz, 14, 9, false); FX.ring(ix, iz, 0xffffff, 3 + k.combo, 0.25, 1.1 * b.size, 0.8); FX.shake(0.18 + 0.06 * k.combo);
+    Snd.impact(0.22 + 0.08 * k.combo, false); Snd.yelp(b.size); cam.punch = Math.max(cam.punch, 0.2);
+    b.flash = 0.8; b.squash = 0.6;
+    if (b.T.boss) b.st = Math.max(b.st, 1.2);
+    else { b.res = Math.max(12, b.res - S.power * 0.12); b.state = 'stunned'; b.st = Math.max(b.st || 0, 0.8); b.kvx = k.dx * 2.5; b.kvz = k.dz * 2.5; b.aware = 1; }
+    S.fury = Math.min(100, S.fury + 4 * S.furyMul); addXP(2);
+    showHit('Combo ' + k.combo, 'soft', ['×' + k.combo]).verdict.textContent = k.combo === 3 ? 'Encore un : le final' : 'Enchaîne !';
+  }
   function bossHit(b, k) {
     if (!(b.vuln || k.mega)) { parry(b, k, 'Il pare tout tant qu\'il n\'est pas sonné'); return; }
     if (k.c < 0.5 && !k.mega) { parry(b, k, 'Trop mou : arme au moins à moitié'); return; }
@@ -740,7 +768,9 @@
       if (S.fury >= 100) { Snd.perfect(); FX.ring(P.x, P.z, 0xff3b2b, 5, 0.4, P.y + 0.2, 0.9); }
     }
     Snd.focus(P.focusing ? 0.3 + 0.7 * S.fury / 100 : 0);
-    if (I.kick && !P.charging && canAct) { P.charging = true; P.chargeT = 0; P.fullPing = false; Snd.chargeStart(); }
+    P.tapBuf = Math.max(0, P.tapBuf - dt); P.comboWin = Math.max(0, P.comboWin - dt); P.tpComboT = Math.max(0, P.tpComboT - dt);
+    if (P.tapBuf > 0 && !I.kick && canAct && !P.charging) { P.tapBuf = 0; P.chargeT = 0; startKick(); }   // appui déjà relâché : coup de combo tout de suite
+    else if (I.kick && !P.charging && canAct) { P.tapBuf = 0; P.charging = true; P.chargeT = 0; P.fullPing = false; Snd.chargeStart(); }
     if (P.charging) {
       P.chargeT += dt * S.chargeRate;
       const c = Math.min(1, P.chargeT / CFG.chargeTime); Snd.chargeSet(c);
@@ -806,7 +836,7 @@
     P.kickPose = damp(P.kickPose, P.kick ? 1 : 0, P.kick ? 45 : 9, dt);
     pm.root.position.set(P.x, P.y, P.z); pm.root.rotation.y = P.face;
     pm.root.visible = !(P.invuln > 0 && P.hurtT <= 0 && Math.floor(S.rt * 18) % 2 === 0 && S.hearts > 0);
-    Actors.animPlayer(pm, { speed: P.speed, crouch: P.crouchK, charge: Math.max(P.chargePose, P.focusing ? 0.45 : 0), kick: P.kickPose, sprint: P.sprintK, climb: P.climb, air: !P.ground && !P.climb, mega: S.fury >= 100 }, dt, S.rt);
+    Actors.animPlayer(pm, { speed: P.speed, crouch: P.crouchK, charge: Math.max(P.chargePose, P.focusing ? 0.45 : 0), kick: P.kickPose, alt: !!(P.kick && P.kick.combo && P.kick.combo < 4 && P.kickSide), sprint: P.sprintK, climb: P.climb, air: !P.ground && !P.climb, mega: S.fury >= 100 }, dt, S.rt);
     Snd.setRush(P.sprintK); FX.rush = P.sprintK;
     // repères au sol : cercle d'armé, cible visée
     const c = P.charging ? Math.min(1, P.chargeT / CFG.chargeTime) : 0;
@@ -845,6 +875,7 @@
     () => coarse ? 'Maintiens <b>Chassé</b> pour armer, relâche pour frapper.' : 'Maintiens le <kbd>clic</kbd> ou <kbd>Entrée</kbd> pour armer ton chassé, relâche pour frapper. Ça marche aussi sur les arbres et les murs.',
     () => coarse ? 'Bouton <b>Accroupi</b> dans les hautes herbes : les ours ne te voient plus.' : 'Accroupis-toi avec <kbd>C</kbd> dans les hautes herbes : les ours ne te voient plus.',
     () => coarse ? 'Maintiens <b>Téléport</b> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <b>Furie</b> pour la recharger.' : 'Maintiens <kbd>X</kbd> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <kbd>R</kbd> pour la recharger.',
+    () => coarse ? 'Tape <b>Chassé</b> plusieurs fois de suite : combo de quatre coups, le dernier projette. Pendant le combo, la cible ne peut rien faire.' : 'Tape le <kbd>clic</kbd> plusieurs fois de suite : combo de quatre coups, le dernier projette. Pendant le combo, la cible ne peut rien faire.',
     () => 'Le cône au sol montre ce que l\'ours voit. Arrive par derrière : un ours surpris encaisse le double.',
     () => 'Relâche pile quand la jauge flashe en blanc : armé parfait, +30 % de puissance.',
   ];
@@ -1038,7 +1069,18 @@
     // sur téléphone, on tente le plein écran d'office : s'il est refusé, le jeu continue tel quel
     if (coarse && !fsEl()) { const req = wrap.requestFullscreen || wrap.webkitRequestFullscreen; if (req) { try { Promise.resolve(req.call(wrap)).catch(() => { }); } catch (_) { /* rien */ } } }
   }
-  $('btn-play').addEventListener('click', () => enter(joinCode && Net.available() ? 'join' : 'solo'));
+  // avant un duel : on choisit son nom
+  let playerName = ''; try { playerName = localStorage.getItem('chasse-ours-nom') || ''; } catch (_) { /* rien */ }
+  function askName(mode) {
+    Snd.init(); const inp = $('name-input'); inp.value = playerName; $('title-screen').hidden = true; $('name-screen').hidden = false;
+    $('name-form').onsubmit = e => {
+      e.preventDefault(); playerName = inp.value.replace(/\s+/g, ' ').trim().slice(0, 14) || 'Promeneur';
+      try { localStorage.setItem('chasse-ours-nom', playerName); } catch (_) { /* rien */ }
+      inp.blur(); $('name-screen').hidden = true; Duel.setName(playerName); enter(mode);
+    };
+    setTimeout(() => { try { inp.focus(); } catch (_) { /* rien */ } }, 60);
+  }
+  $('btn-play').addEventListener('click', () => { if (joinCode && Net.available()) askName('join'); else enter('solo'); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) setPause(true); });
 
   /* ---------- démarrage ---------- */
@@ -1050,12 +1092,12 @@
     el.textContent = `Partie retrouvée : ${Story.hud().eyebrow}, niveau ${S.level}, ${S.kicked} ours envoyés.`; $('btn-play').textContent = 'Reprendre la balade';
   }
   resize(); resetBears();
-  Duel.init({ S, P, cam, pm, scene, wrap, banner, floatText, showHit, impactFX, project, after, whenCalm, card, dismissCard, stopCharge, edgePos, breakThing, fireRay, tryDodge });
+  Duel.init({ S, P, cam, pm, scene, wrap, banner, floatText, showHit, impactFX, project, after, whenCalm, card, dismissCard, stopCharge, edgePos, breakThing, fireRay, tryDodge, comboFx: (x, z, k) => { S.hitstop = Math.max(S.hitstop, 0.045); FX.sparks(x, 1.2, z, k.dx, k.dz, 14, 9, false); FX.ring(x, z, 0xffffff, 3 + (k.combo || 1), 0.25, 1.1, 0.8); FX.shake(0.2); Snd.impact(0.3, false); } });
   const bd = $('btn-duel');
   if (Net.available()) {
     bd.hidden = false;
     if (joinCode) { $('btn-play').textContent = 'Rejoindre le duel'; $('save-line').hidden = true; bd.textContent = 'Jouer en solo'; bd.addEventListener('click', () => enter('solo')); }
-    else bd.addEventListener('click', () => enter('host'));
+    else bd.addEventListener('click', () => askName('host'));
   } else { const n = $('duel-note'); n.hidden = false; n.textContent = joinCode ? 'Ce lien de duel ne s\'ouvre que dans un navigateur, hors de l\'appli.' : 'Le duel à deux se joue sur la version navigateur du jeu.'; }
   window.__chasse = { S, P, bears, I, cam, spawnBear, alertBear, CFG, Story, Duel, Net };
   requestAnimationFrame(frame);

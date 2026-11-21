@@ -57,6 +57,7 @@ const Actors = (() => {
     m.legB.scale.y = ls; m.legB.rotation.x = -sw * front; m.legB.rotation.z = -0.14 * side;
     m.legA.rotation.x = sw * front;
     m.legA.rotation.z = lerp(0.85 * ch, Math.PI / 2 * 1.02, k);
+    if (s.alt && k > 0.05) { m.legA.rotation.z = lerp(0.85 * ch, 0.35, k); m.legA.rotation.x = -1.5 * k; }   // coup de combo alterné : un direct de face
     m.legA.scale.y = lerp(lerp(ls, 0.7, ch), 1.2, k);
     const as = 0.9 + 0.7 * (s.sprint || 0); m.armA.rotation.x = lerp(-sw * as, -1.3, side); m.armB.rotation.x = lerp(sw * as, -1.7, side);
     m.armA.rotation.z = 0.5 * side; m.armB.rotation.z = -0.4 * side;

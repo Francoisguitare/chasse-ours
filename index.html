@@ -109,6 +109,7 @@
         <span><kbd>Espace</kbd> sauter, deux fois d'affilée</span>
         <span><kbd>X</kbd> maintenu : téléportation dans le dos de la cible en armant, relâcher pour frapper (25 % de Furie)</span>
         <span><kbd>R</kbd> maintenu : recharger la Furie, immobile</span>
+        <span>Appuis brefs répétés sur le chassé : combo de 4 coups</span>
         <span><kbd>clic</kbd> ou <kbd>Entrée</kbd> maintenir pour armer, relâcher pour frapper</span>
         <span><kbd>clic droit</kbd> ou <kbd>A</kbd> <kbd>E</kbd> tourner la caméra, molette pour la distance</span>
       </div>
@@ -119,6 +120,7 @@
         <span>Bouton Saut : deux sauts d'affilée</span>
         <span>Téléport maintenu : dans son dos en armant, relâcher pour frapper</span>
         <span>Furie maintenu : recharger la jauge</span>
+        <span>Chassé tapé plusieurs fois : combo de 4 coups</span>
       </div>
       <div class="title-btns">
         <button id="btn-play" type="button" class="cta">Entrer dans la plaine</button>
@@ -137,6 +139,16 @@
       <p id="lu-sub"></p>
       <div id="lu-perks" class="perks"></div>
     </div>
+  </div>
+
+  <div id="name-screen" class="overlay" hidden>
+    <form class="lu-card name-card" id="name-form" autocomplete="off">
+      <p class="eyebrow">Duel</p>
+      <h2>Ton nom</h2>
+      <p>Ton adversaire le verra au-dessus de ta tête et au tableau des points.</p>
+      <input id="name-input" type="text" maxlength="14" placeholder="Promeneur" aria-label="Nom du personnage" enterkeyhint="go" autocapitalize="words" spellcheck="false">
+      <button type="submit" class="cta">Entrer dans l'arène</button>
+    </form>
   </div>
 
   <div id="card" class="overlay" hidden>
