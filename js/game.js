@@ -131,6 +131,10 @@
   addEventListener('pointerup', e => { if (e.pointerType === 'mouse') { if (e.button === 2) lookMouse = false; else kickUp(); } });
   wrap.addEventListener('wheel', e => { if (!playing()) return; e.preventDefault(); cam.uz = clamp(cam.uz * Math.exp(e.deltaY * 0.0011), 0.55, 1.6); }, { passive: false });
   wrap.addEventListener('contextmenu', e => e.preventDefault());
+  // jamais de sélection de texte pendant qu'on joue (sauf le lien d'invitation)
+  document.addEventListener('selectstart', e => { if (!(e.target && e.target.closest && e.target.closest('input'))) e.preventDefault(); });
+  $('touch').addEventListener('pointerdown', () => { const sel = window.getSelection && window.getSelection(); if (sel && sel.rangeCount) sel.removeAllRanges(); }, true);
+  $('touch').addEventListener('contextmenu', e => e.preventDefault());
   addEventListener('touchstart', () => { if (!coarse) { coarse = true; document.body.classList.add('touch'); if (S.running) $('touch').hidden = false; resize(); } }, { passive: true });
 
   // tactile : pouce gauche = déplacement, pouce droit qui glisse = caméra

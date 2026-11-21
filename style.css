@@ -29,6 +29,10 @@ body {
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
 }
 button { font: inherit; color: inherit; cursor: pointer; }
+/* appui long sur mobile : ni sélection de texte, ni menu, ni loupe */
+#game, #game * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#game input { -webkit-user-select: text; user-select: text; }
+#touch button, #touch div { touch-action: none; -webkit-tap-highlight-color: transparent; }
 button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
 #game { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; background: var(--night); }
