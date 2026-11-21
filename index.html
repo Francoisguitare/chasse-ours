@@ -145,8 +145,14 @@
     <form class="lu-card name-card" id="name-form" autocomplete="off">
       <p class="eyebrow">Duel</p>
       <h2>Ton nom</h2>
-      <p>Ton adversaire le verra au-dessus de ta tête et au tableau des points.</p>
+      <p>Les autres joueurs le verront au-dessus de ta tête et au tableau des points.</p>
       <input id="name-input" type="text" maxlength="14" placeholder="Promeneur" aria-label="Nom du personnage" enterkeyhint="go" autocapitalize="words" spellcheck="false">
+      <fieldset id="goal-pick" class="goal-pick">
+        <legend>Premier arrivé à</legend>
+        <label><input type="radio" name="goal" value="5"><span>5</span></label>
+        <label><input type="radio" name="goal" value="11" checked><span>11</span></label>
+        <label><input type="radio" name="goal" value="21"><span>21</span></label>
+      </fieldset>
       <button type="submit" class="cta">Entrer dans l'arène</button>
     </form>
   </div>

@@ -527,7 +527,7 @@
     const ix = b.x - k.dx * b.rad * 0.6, iy = 1.3 * b.size, iz = b.z - k.dz * b.rad * 0.6, sp = project(ix, iy, iz);
     const tier = tierOf(S.level);
     FX.impact({ x: ix, y: iy, z: iz, dx: k.dx, dz: k.dz, heavy, mega, tier, sx: sp.x, sy: sp.y });
-    Snd.impact(heavy, mega); Snd.slowmo(S.slowDur + S.hitstop); Snd.yelp(b.size);
+    Snd.impact(heavy, mega); Snd.slowmo(S.slowDur + S.hitstop); Snd.yelp(b.size); if (k.combo === 4) Snd.combo(4);
     cam.punch = Math.min(1.4, 0.5 + 0.6 * heavy);
     if (mega) World.darken(1);
     b.flash = 1.2; b.squash = 1;
@@ -646,7 +646,7 @@
     S.hitstop = 0.045; S.slowLaunch = false; S.slowDur = 0; S.slowT = 1;
     const ix = b.x - k.dx * b.rad * 0.6, iz = b.z - k.dz * b.rad * 0.6;
     FX.sparks(ix, 1.2 * b.size, iz, k.dx, k.dz, 14, 9, false); FX.ring(ix, iz, 0xffffff, 3 + k.combo, 0.25, 1.1 * b.size, 0.8); FX.shake(0.18 + 0.06 * k.combo);
-    Snd.impact(0.22 + 0.08 * k.combo, false); Snd.yelp(b.size); cam.punch = Math.max(cam.punch, 0.2);
+    Snd.combo(k.combo); Snd.yelp(b.size); cam.punch = Math.max(cam.punch, 0.2);
     b.flash = 0.8; b.squash = 0.6;
     if (b.T.boss) b.st = Math.max(b.st, 1.2);
     else { b.res = Math.max(12, b.res - S.power * 0.12); b.state = 'stunned'; b.st = Math.max(b.st || 0, 0.8); b.kvx = k.dx * 2.5; b.kvz = k.dz * 2.5; b.aware = 1; }
@@ -1072,11 +1072,14 @@
   // avant un duel : on choisit son nom
   let playerName = ''; try { playerName = localStorage.getItem('chasse-ours-nom') || ''; } catch (_) { /* rien */ }
   function askName(mode) {
+    $('goal-pick').hidden = mode !== 'host';   // seul celui qui crée le duel choisit le nombre de points
     Snd.init(); const inp = $('name-input'); inp.value = playerName; $('title-screen').hidden = true; $('name-screen').hidden = false;
     $('name-form').onsubmit = e => {
       e.preventDefault(); playerName = inp.value.replace(/\s+/g, ' ').trim().slice(0, 14) || 'Promeneur';
       try { localStorage.setItem('chasse-ours-nom', playerName); } catch (_) { /* rien */ }
-      inp.blur(); $('name-screen').hidden = true; Duel.setName(playerName); enter(mode);
+      inp.blur(); $('name-screen').hidden = true; Duel.setName(playerName);
+      if (mode === 'host') { const g = document.querySelector('input[name="goal"]:checked'); Duel.setGoal(g ? +g.value : 11); }
+      enter(mode);
     };
     setTimeout(() => { try { inp.focus(); } catch (_) { /* rien */ } }, 60);
   }
@@ -1092,7 +1095,7 @@
     el.textContent = `Partie retrouvée : ${Story.hud().eyebrow}, niveau ${S.level}, ${S.kicked} ours envoyés.`; $('btn-play').textContent = 'Reprendre la balade';
   }
   resize(); resetBears();
-  Duel.init({ S, P, cam, pm, scene, wrap, banner, floatText, showHit, impactFX, project, after, whenCalm, card, dismissCard, stopCharge, edgePos, breakThing, fireRay, tryDodge, comboFx: (x, z, k) => { S.hitstop = Math.max(S.hitstop, 0.045); FX.sparks(x, 1.2, z, k.dx, k.dz, 14, 9, false); FX.ring(x, z, 0xffffff, 3 + (k.combo || 1), 0.25, 1.1, 0.8); FX.shake(0.2); Snd.impact(0.3, false); } });
+  Duel.init({ S, P, cam, pm, scene, wrap, banner, floatText, showHit, impactFX, project, after, whenCalm, card, dismissCard, stopCharge, edgePos, breakThing, fireRay, tryDodge, comboFx: (x, z, k) => { S.hitstop = Math.max(S.hitstop, 0.045); FX.sparks(x, 1.2, z, k.dx, k.dz, 14, 9, false); FX.ring(x, z, 0xffffff, 3 + (k.combo || 1), 0.25, 1.1, 0.8); FX.shake(0.2); Snd.combo(k.combo || 1); } });
   const bd = $('btn-duel');
   if (Net.available()) {
     bd.hidden = false;

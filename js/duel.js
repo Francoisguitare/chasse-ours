@@ -2,7 +2,8 @@
 const Duel = (() => {
   'use strict';
   let G, myName = 'Promeneur', lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
-  const GOAL = 5, others = new Map(), $ = id => document.getElementById(id);
+  let GOAL = 11;
+  const others = new Map(), $ = id => document.getElementById(id);
   const ARENA = { x: 10, z: -95, r: 54 };
   const SPAWNS = [[10, -66], [21, -119], [-4, -96], [20.5, -82]];
   const COLORS = [[0x2f6fb5, 0x265d99], [0x8a3fb0, 0x733494], [0x1f9a8a, 0x1a8071]];
@@ -62,15 +63,16 @@ const Duel = (() => {
       const o = others.get(d.id) || add(d.id, d), now = performance.now(), gap = Math.max(0.03, (now - o.seen) / 1000);
       o.v = Math.hypot(d.x - o.tx, d.z - o.tz) / gap; o.seen = now; o.tx = d.x; o.ty = d.y; o.tz = d.z; o.tf = d.f;
       o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0; o.hp = num(d.hp) ? U.clamp(d.hp, 0, 100) : 100;
+      if (d.id === 'h' && !Net.isHost && num(d.g) && [5, 11, 21].includes(d.g) && d.g !== GOAL) { GOAL = d.g; scoreKey = ''; }   // l'hôte fixe le nombre de points
       if (typeof d.n === 'string') { const nm = d.n.replace(/[\u0000-\u001f]/g, '').slice(0, 14).trim(); if (nm && nm !== o.name) { const first = !o.name; o.name = nm; scoreKey = ''; if (first) G.banner(`${nm} entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3600); } }
       if (num(d.tp) && d.tp !== o.tp) { if (o.tp !== undefined) { FX.tpOut(o.x, o.y, o.z); o.x = d.x; o.y = d.y; o.z = d.z; o.f = d.f; FX.tpIn(o.x, o.y, o.z); Snd.teleport(); } o.tp = d.tp; }
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
-    else if (d.t === 'win' && !over) { over = true; G.whenCalm(() => endCard(false)); }
+    else if (d.t === 'win' && !over) { over = true; const w = others.get(d.id); G.whenCalm(() => endCard(false, w && w.name)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
     else if (d.t === 'dodge' && d.to === Net.id()) { G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos'; }
     else if (d.t === 'ko' && d.to === Net.id() && !over) {   // c'est la victime qui annonce le K.-O. : elle seule connaît sa santé
       score += d.pts === 2 ? 2 : 1; scoreKey = ''; Snd.levelUp();
-      G.banner(`${d.pts === 2 ? 'Désintégré' : 'K.-O.'}<small>+${d.pts === 2 ? 2 : 1} · ${score} à ${best() ? best().sc : 0}</small>`, '', 2400);
+      G.banner(`${d.pts === 2 ? 'Désintégré' : 'K.-O.'}<small>+${d.pts === 2 ? 2 : 1} · tu as ${score} sur ${GOAL}</small>`, '', 2400);
       if (score >= GOAL) { over = true; Net.send({ t: 'win', id: Net.id() }); G.whenCalm(() => endCard(true)); }
     }
     else if (d.t === 'brk' && 'trw'.includes(d.k) && num(d.dx) && num(d.dz)) G.breakThing(d.k, d.i | 0, d.dx, d.dz, true);   // l'autre a cassé quelque chose
@@ -83,7 +85,7 @@ const Duel = (() => {
     sendAcc += rdt;
     if (sendAcc > 0.066) {
       sendAcc = 0;
-      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp), n: myName });
+      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp), n: myName, g: Net.isHost ? GOAL : undefined });
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
@@ -105,8 +107,14 @@ const Duel = (() => {
     refresh();
   }
   function best() { let b = null; for (const o of others.values()) if (!b || o.sc > b.sc) b = o; return b; }
-  function line() { const b = best(); return b ? `${myName} ${score} · ${b.sc} ${b.name || 'Adversaire'}` : 'En attente d\'un adversaire'; }
-  function refresh() { const t = line(); if (t !== scoreKey) { scoreKey = t; $('duel-score').textContent = t; } }
+  function ranking() { return [{ name: myName, sc: score, me: true }].concat([...others.values()].map(o => ({ name: o.name || 'Adversaire', sc: o.sc || 0 }))).sort((a, b) => b.sc - a.sc || (a.me ? -1 : 1)); }
+  function line() { return others.size ? ranking().map(r => `${r.name} ${r.sc}`).join(' · ') : 'En attente d\'un adversaire'; }
+  function refresh() {
+    const t = line() + '|' + GOAL; if (t === scoreKey) return; scoreKey = t; const el = $('duel-score'); el.textContent = '';
+    const head = document.createElement('div'); head.className = 'ds-goal'; head.textContent = `Premier à ${GOAL}`; el.appendChild(head);
+    if (!others.size) { const w = document.createElement('div'); w.className = 'ds-row'; w.textContent = 'En attente d\'un adversaire'; el.appendChild(w); return; }
+    ranking().forEach((r, i) => { const row = document.createElement('div'); row.className = 'ds-row' + (r.me ? ' me' : '') + (i === 0 && r.sc > 0 ? ' lead' : ''); const n = document.createElement('span'); n.textContent = r.name; const s = document.createElement('b'); s.textContent = r.sc; row.append(n, s); el.appendChild(row); });
+  }
   const hud = () => ({ eyebrow: `Duel · premier à ${GOAL}`, text: line(), k: score / GOAL });
 
   /* ---------- donner et recevoir ---------- */
@@ -118,14 +126,14 @@ const Duel = (() => {
       const lite = k.combo && k.combo < 4;
       if (lite) {   // coup de combo : peu de dégâts, mais la cible est bloquée tant que ça enchaîne
         const dm = 7; G.comboFx(o.x, o.z, k);
-        Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: 0, launch: false, mega: false, dmg: dm, stun: 0.7 });
+        Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: 0, launch: false, mega: false, dmg: dm, stun: 0.7, cb: k.combo });
         S.fury = Math.min(100, S.fury + 4); G.showHit('Combo ' + k.combo, 'soft', ['−' + dm]).verdict.textContent = k.combo === 3 ? 'Encore un : le final' : 'Enchaîne !';
         return true;
       }
       const dmg = k.mega ? 999 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1) * (k.combo === 4 ? 1.3 : 1));
       const tags = []; if (k.combo === 4) tags.push('Fin de combo'); if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
       G.impactFX(dummy(o.x, o.z), k, U.clamp(0.4 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0), 0.3, 1.6), !!k.mega, launch);
-      Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega, dmg });
+      Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega, dmg, cb: k.combo || 0 });
       if (k.mega) { S.fury = 0; G.fireRay(o.x, o.y + 1.2, o.z, k.dx, k.dz); }
       if (!k.mega) S.fury = Math.min(100, S.fury + (launch ? 18 : 6));
       const left = Math.max(0, (o.hp === undefined ? 100 : o.hp) - dmg);
@@ -140,7 +148,8 @@ const Duel = (() => {
     const a = others.get(d.id);
     if (a && G.tryDodge({ x: a.x, z: a.z, f: a.f, rad: 0.6 })) { Net.send({ t: 'dodge', id: Net.id(), to: d.id }); return; }
     G.stopCharge(); P.kick = null;
-    if (num(d.stun)) G.comboFx(P.x, P.z, { dx, dz, combo: 2 }); else G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
+    const cb = num(d.cb) ? U.clamp(d.cb | 0, 0, 4) : 0;
+    if (num(d.stun)) G.comboFx(P.x, P.z, { dx, dz, combo: cb || 1 }); else G.impactFX(dummy(P.x, P.z), { dx, dz, combo: cb }, d.launch ? 1.1 : 0.5, !!d.mega, false);
     const el = $('hurt'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
     if (d.mega) G.fireRay(P.x, (P.y || 0) + 1.2, P.z, dx, dz, true);
     const S = G.S; S.hp = d.mega ? 0 : Math.max(0, S.hp - (num(d.dmg) ? U.clamp(d.dmg, 0, 999) : 20));
@@ -170,9 +179,9 @@ const Duel = (() => {
     }
   }
   function clamp(o) { const dx = o.x - ARENA.x, dz = o.z - ARENA.z, d = Math.hypot(dx, dz); if (d > ARENA.r) { o.x = ARENA.x + dx / d * ARENA.r; o.z = ARENA.z + dz / d * ARENA.r; } }
-  function endCard(won) {
-    const b = best();
-    G.card({ eyebrow: 'Duel terminé', title: won ? 'Victoire' : 'Défaite', paras: [`${score} à ${b ? b.sc : 0}. ${won ? 'Ton adversaire est parti voir les montagnes de près.' : 'Tu as vu les montagnes de près. Cache-toi mieux, frappe dans le dos.'}`], button: 'Revanche' }, () => { Net.send({ t: 'again' }); reset(); });
+  function endCard(won, winner) {
+    const rk = ranking().map((r, i) => `${i + 1}. ${r.name} : ${r.sc}`);
+    G.card({ eyebrow: 'Duel terminé · premier à ' + GOAL, title: won ? 'Victoire' : (winner ? winner + ' gagne' : 'Défaite'), paras: [won ? 'Tes adversaires sont partis voir les montagnes de près.' : 'Tu as vu les montagnes de près. Cache-toi mieux, frappe dans le dos.'].concat(rk), button: 'Revanche' }, () => { Net.send({ t: 'again' }); reset(); });
   }
   function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(role === 'host' ? 0 : 1); G.P.invuln = 2; G.S.fury = 0; G.S.hp = 100; scoreKey = ''; }
 
@@ -192,6 +201,7 @@ const Duel = (() => {
   // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
   function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
   function setName(n) { myName = n; scoreKey = ''; }
+  function setGoal(g) { if ([5, 11, 21].includes(g)) { GOAL = g; scoreKey = ''; } }
   function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
-  return { init, start, update, hud, kickTest, threat, nearest, setName, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
+  return { init, start, update, hud, kickTest, threat, nearest, setName, setGoal, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
 })();

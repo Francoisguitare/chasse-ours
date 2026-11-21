@@ -291,6 +291,12 @@ h1 span { color: var(--amber); }
 #t-focus.on { background: #ff3b2b; color: #fff; box-shadow: 0 0 22px #ff3b2b; transform: scale(1.06); }
 #game.compact #t-focus { width: 54px; height: 54px; font-size: 10px; right: calc(var(--gr) + 180px); }
 #fury-gauge.focus { border-color: #ff3b2b; box-shadow: 0 0 16px rgba(255, 59, 43, .7); }
+.goal-pick { border: 0; padding: 0; margin: 0; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.goal-pick legend { width: 100%; text-align: center; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; margin-bottom: 4px; }
+.goal-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.goal-pick span { display: block; min-width: 56px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; font-family: var(--f-display); font-size: 20px; text-align: center; cursor: pointer; }
+.goal-pick input:checked + span { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+.goal-pick input:focus-visible + span { outline: 3px solid var(--amber); outline-offset: 2px; }
 #name-screen { background: rgba(10, 22, 16, .9); z-index: 8; }
 .name-card { width: min(100%, 420px); }
 #name-input { width: 100%; font: 700 24px var(--f-ui); text-align: center; color: var(--ink); background: var(--cream); border: 0; border-radius: 4px; padding: 10px 12px; letter-spacing: .04em; }
@@ -301,12 +307,17 @@ h1 span { color: var(--amber); }
 @media (pointer: fine) { #game.ray #c3d { filter: saturate(1.5) contrast(1.25) !important; } }
 
 /* ---------- Duel ---------- */
-#duel-score { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-display); font-size: clamp(15px, 3.4vw, 22px); color: var(--cream); text-shadow: 0 2px 0 var(--ember), 0 4px 0 var(--ink); }
+#duel-score { position: absolute; left: 50%; top: 38px; transform: translateX(-50%); min-width: 150px; display: flex; flex-direction: column; gap: 1px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px 6px; font-size: 15px; font-weight: 600; pointer-events: none; }
+.ds-goal { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--amber); text-align: center; }
+.ds-row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
+.ds-row b { font-family: var(--f-display); font-weight: 400; font-variant-numeric: tabular-nums; }
+.ds-row.me span { color: var(--amber); }
+.ds-row.lead b { color: var(--leaf); }
 #game.duel .lvl, #game.duel .hearts, #game.duel .stats { display: none; }
-#game.duel #banner { top: 78px; }
-#game.compact #duel-score { top: 36px; }
+#game.duel #banner { top: 138px; }
+#game.compact #duel-score { top: 32px; font-size: 13px; padding: 3px 8px 4px; min-width: 120px; }
 #game.compact.duel .chip { top: 9px; }
-#game.compact.duel #banner { top: 68px; }
+#game.compact.duel #banner { top: 118px; }
 #invite { z-index: 6; position: absolute; left: 50%; top: max(32%, 150px); transform: translateX(-50%); width: min(92vw, 440px); pointer-events: auto; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--amber); border-radius: 4px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 9px; }
 #invite p { margin: 0; font-size: 16px; font-weight: 500; }
 #invite p b { color: var(--amber); }

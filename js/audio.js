@@ -361,6 +361,18 @@ const Snd = (() => {
     fo.g.gain.setTargetAtTime(0.0001 + 0.13 * v, t, 0.08); fo.ng.gain.setTargetAtTime(0.0001 + 0.05 * v, t, 0.08);
     fo.lp.frequency.setTargetAtTime(300 + 1800 * v, t, 0.1); fo.o1.frequency.setTargetAtTime(62 + 40 * v, t, 0.1); fo.o2.frequency.setTargetAtTime(93.4 + 60 * v, t, 0.1);
   }
+  // un son par coup de combo : claque sèche, coup sourd, double craquement, puis le final qui explose
+  function combo(n) {
+    if (!ok()) return; const t = now();
+    if (n === 1) { nz(t, 0.05, 'highpass', 2600, 0.7, 0.8); tone(t, 0.09, 'triangle', 520, 260, 0.35); }
+    else if (n === 2) { tone(t, 0.2, 'sine', 210, 70, 0.8); nz(t, 0.09, 'lowpass', 1200, 0.7, 0.6); tone(t, 0.07, 'square', 330, 180, 0.08); }
+    else if (n === 3) { for (const d of [0, 0.055]) { nz(t + d, 0.045, 'bandpass', 3200 - d * 9000, 1.5, 0.7).connect(revIn); tone(t + d, 0.12, 'triangle', 420 - d * 1600, 140, 0.4); } tone(t + 0.05, 0.28, 'sine', 160, 50, 0.7); }
+    else {
+      const sw = nz(t, 0.16, 'bandpass', 400, 1.2, 0.0001, null, 4000); sw.gain.cancelScheduledValues(t); sw.gain.setValueAtTime(0.0001, t); sw.gain.exponentialRampToValueAtTime(0.45, t + 0.14); sw.gain.linearRampToValueAtTime(0.0001, t + 0.16);
+      const t1 = t + 0.12; tone(t1, 1.1, 'sine', 150, 30, 1.0).connect(echoIn); nz(t1, 0.08, 'highpass', 1500, 0.7, 1.0).connect(revIn); nz(t1, 0.6, 'lowpass', 600, 0.7, 0.8, null, 90).connect(revIn);
+      [62, 69, 74].forEach(m => tone(t1, 0.7, 'sawtooth', mtof(m), mtof(m) * 0.5, 0.07).connect(revIn));
+    }
+  }
   function parry() { if (!ok()) return; const t = now(); nz(t, 0.09, 'bandpass', 3200, 2, 0.6).connect(revIn); tone(t, 0.18, 'square', 520, 240, 0.14); tone(t, 0.25, 'sine', 120, 60, 0.4); }
   function miss() { if (!ok()) return; tone(now(), 0.25, 'triangle', 300, 160, 0.08); }
 
@@ -373,5 +385,5 @@ const Snd = (() => {
   function setMuted(v) { muted = v; if (ctx) master.gain.setTargetAtTime(v ? 0 : 0.9, now(), 0.03); }
   function suspend(v) { if (!ctx) return; if (v) ctx.suspend(); else ctx.resume(); }
 
-  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, teleport, focus, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
+  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, teleport, focus, combo, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
 })();
