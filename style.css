@@ -277,7 +277,7 @@ h1 span { color: var(--amber); }
 #game.compact #duel-score { top: 36px; }
 #game.compact.duel .chip { top: 9px; }
 #game.compact.duel #banner { top: 68px; }
-#invite { position: absolute; left: 50%; top: max(32%, 150px); transform: translateX(-50%); width: min(92vw, 440px); pointer-events: auto; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--amber); border-radius: 4px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 9px; }
+#invite { z-index: 6; position: absolute; left: 50%; top: max(32%, 150px); transform: translateX(-50%); width: min(92vw, 440px); pointer-events: auto; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--amber); border-radius: 4px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 9px; }
 #invite p { margin: 0; font-size: 16px; font-weight: 500; }
 #invite p b { color: var(--amber); }
 #invite input { width: 100%; font: 600 15px var(--f-ui); color: var(--ink); background: var(--cream); border: 0; border-radius: 3px; padding: 8px 10px; -webkit-user-select: text; user-select: text; }

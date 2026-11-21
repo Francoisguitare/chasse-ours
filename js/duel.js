@@ -16,7 +16,8 @@ const Duel = (() => {
     $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
     $('invite-copy').addEventListener('click', () => {
       const inp = $('invite-link'), ok = () => { $('invite-copy').textContent = 'Lien copié'; };
-      const sel = () => { inp.focus(); inp.select(); };
+      // secours si le presse-papiers est refusé : ancienne méthode, sinon on laisse le lien sélectionné
+      const sel = () => { inp.focus(); inp.select(); inp.setSelectionRange(0, 9999); let done = false; try { done = document.execCommand('copy'); } catch (_) { /* rien */ } if (done) ok(); else $('invite-copy').textContent = 'Lien sélectionné : copie-le'; };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inp.value).then(ok).catch(sel); else sel();
     });
     $('invite-share').addEventListener('click', () => { navigator.share({ title: 'Chassé d\'Ours', text: 'Duel de chassés dans les ruines de Val-Perdu', url: $('invite-link').value }).catch(() => { }); });
