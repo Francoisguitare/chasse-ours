@@ -330,6 +330,20 @@ const Snd = (() => {
     musicBus.gain.cancelScheduledValues(t); musicBus.gain.setValueAtTime(0.05, t); musicBus.gain.linearRampToValueAtTime(0.85, t + 4);
     musicLP.frequency.cancelScheduledValues(t); musicLP.frequency.setTargetAtTime(180, t, 0.03); musicLP.frequency.setTargetAtTime(18000, t + 2.4, 0.6);
   }
+  // téléportation façon transmission instantanée : un « tchiou » sec qui monte, un clic, un sifflement bref
+  function teleport() {
+    if (!ok()) return; const t = now();
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter(); o.type = 'square'; f.type = 'bandpass'; f.Q.value = 2.5;
+    o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(3200, t + 0.07); o.frequency.exponentialRampToValueAtTime(1400, t + 0.13);
+    f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(4000, t + 0.08);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.28, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(f); f.connect(g); g.connect(sfxBus); g.connect(echoIn); o.start(t); o.stop(t + 0.18);
+    const v = ctx.createOscillator(), vg = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain(); v.type = 'sine'; lfo.frequency.value = 38; lg.gain.value = 120;
+    v.frequency.setValueAtTime(2600, t + 0.06); v.frequency.exponentialRampToValueAtTime(900, t + 0.3); lfo.connect(lg); lg.connect(v.frequency);
+    vg.gain.setValueAtTime(0.0001, t + 0.06); vg.gain.linearRampToValueAtTime(0.14, t + 0.08); vg.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    v.connect(vg); vg.connect(sfxBus); vg.connect(revIn); v.start(t + 0.06); lfo.start(t + 0.06); v.stop(t + 0.34); lfo.stop(t + 0.34);
+    nz(t, 0.09, 'highpass', 3000, 0.7, 0.35, null, 9000); nz(t + 0.005, 0.02, 'highpass', 5000, 0.7, 0.5);
+  }
   function parry() { if (!ok()) return; const t = now(); nz(t, 0.09, 'bandpass', 3200, 2, 0.6).connect(revIn); tone(t, 0.18, 'square', 520, 240, 0.14); tone(t, 0.25, 'sine', 120, 60, 0.4); }
   function miss() { if (!ok()) return; tone(now(), 0.25, 'triangle', 300, 160, 0.08); }
 
@@ -342,5 +356,5 @@ const Snd = (() => {
   function setMuted(v) { muted = v; if (ctx) master.gain.setTargetAtTime(v ? 0 : 0.9, now(), 0.03); }
   function suspend(v) { if (!ctx) return; if (v) ctx.suspend(); else ctx.resume(); }
 
-  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
+  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, teleport, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
 })();

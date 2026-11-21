@@ -198,6 +198,17 @@ const FX = (() => {
     shake(1.2); flash(reduce ? 0.2 : 0.42, '255,60,40'); speedLines((p.x * 0.5 + 0.5) * VW, (-p.y * 0.5 + 0.5) * VH, 1.1, 1);
     if (!reduce) impactFrame(120);
   }
+  // téléportation : l'image résiduelle s'efface en traits, l'arrivée claque en anneau
+  function tpOut(x, y, z) {
+    for (let i = 0; i < 26; i++) add.spawn(x + rnd(-0.4, 0.4), y + rnd(0.2, 2.2), z + rnd(-0.4, 0.4), rnd(-1.5, 1.5), rnd(3, 9), rnd(-1.5, 1.5), rnd(0.2, 0.45), rnd(0.2, 0.45), 0, 0.75, 0.95, 1, 1, 0, 1);
+    sprite(F.tex.glow, x, y + 1.2, z, 3, 0.4, 0.25, 0x9fe8ff, 0.9);
+  }
+  function tpIn(x, y, z) {
+    sprite(F.tex.ring, x, y + 1.2, z, 0.5, 7, 0.28, 0xbff2ff, 0.95); sprite(F.tex.glow, x, y + 1.2, z, 0.5, 5, 0.25, 0xffffff, 0.9);
+    ring(x, z, 0xbff2ff, 4.5, 0.35, y + 0.15, 0.9);
+    for (let i = 0; i < 22; i++) { const a = rnd(6.283), v = rnd(4, 9); add.spawn(x, y + rnd(0.3, 2), z, Math.cos(a) * v, rnd(-1, 2), Math.sin(a) * v, rnd(0.2, 0.4), 0.3, 0, 0.8, 0.95, 1, 1, 0, 2); }
+    shake(0.15);
+  }
   // passage du mur du son : cône de vapeur, éclair, traits de vitesse
   function sonic(o) {
     const { x, y, z, tier, sx, sy } = o, col = tier >= 4 ? 0x9fefff : tier === 3 ? 0xffb060 : 0xffffff;
@@ -277,6 +288,6 @@ const FX = (() => {
     if (flashA > 0.004) { g2.fillStyle = `rgba(${flashC},${flashA.toFixed(3)})`; g2.fillRect(0, 0, VW, VH); flashA *= Math.exp(-9 * rdt); }
   }
 
-  Object.assign(F, { init, resize, update, draw, impact, ring, dome, sprite, decal, dust, puff, sonic, skyRing, debris, ray, sparks, sparkle, aura, leaves, birds, mote, trail, shake, flash, speedLines, star, shakeOffset, reduce });
+  Object.assign(F, { init, resize, update, draw, impact, ring, dome, sprite, decal, dust, puff, tpOut, tpIn, sonic, skyRing, debris, ray, sparks, sparkle, aura, leaves, birds, mote, trail, shake, flash, speedLines, star, shakeOffset, reduce });
   return F;
 })();

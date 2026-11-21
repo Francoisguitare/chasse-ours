@@ -265,6 +265,11 @@ h1 span { color: var(--amber); }
 #t-crouch { right: calc(var(--gr) + 14px); bottom: max(146px, calc(env(safe-area-inset-bottom, 0px) + 138px)); width: 62px; height: 62px; }
 #game.compact #t-jump { width: 68px; height: 68px; font-size: 12px; right: calc(var(--gr) + 104px); border-width: 2px; background: rgba(47, 93, 58, .6); }
 #game.compact #t-crouch { right: calc(var(--gr) + 14px); bottom: max(126px, calc(env(safe-area-inset-bottom, 0px) + 118px)); width: 54px; height: 54px; font-size: 10px; }
+#t-tp { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 2px solid #bff2ff; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; color: #eafcff;
+  right: calc(var(--gr) + 124px); bottom: max(112px, calc(env(safe-area-inset-bottom, 0px) + 104px)); width: 66px; height: 66px; background: rgba(30, 90, 120, .72); box-shadow: 0 0 14px rgba(140, 230, 255, .45); }
+#t-tp:active { background: #bff2ff; color: var(--ink); transform: scale(.94); }
+#t-tp.low { opacity: .38; box-shadow: none; }
+#game.compact #t-tp { width: 58px; height: 58px; font-size: 10px; right: calc(var(--gr) + 110px); bottom: max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px)); }
 /* rayon de Furie : le monde s'éteint et vire au rouge */
 #game.ray #tint { opacity: 1; }
 #game.ray #tint::after { opacity: 1; animation: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 40, 20, .12) 0%, rgba(110, 0, 0, .62) 70%, rgba(20, 0, 0, .9) 100%); transition: opacity .12s; }

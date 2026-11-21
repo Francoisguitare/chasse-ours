@@ -1,7 +1,7 @@
 /* Chassé d'Ours — duel à deux (ou plus) dans les ruines : chacun voit l'autre, sauf s'il se cache. */
 const Duel = (() => {
   'use strict';
-  let G, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
+  let G, lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
   const GOAL = 7, others = new Map(), $ = id => document.getElementById(id);
   const ARENA = { x: 10, z: -95, r: 54 };
   const SPAWNS = [[10, -66], [21, -119], [-4, -96], [20.5, -82]];
@@ -62,9 +62,14 @@ const Duel = (() => {
       const o = others.get(d.id) || add(d.id, d), now = performance.now(), gap = Math.max(0.03, (now - o.seen) / 1000);
       o.v = Math.hypot(d.x - o.tx, d.z - o.tz) / gap; o.seen = now; o.tx = d.x; o.ty = d.y; o.tz = d.z; o.tf = d.f;
       o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0;
+      if (num(d.tp) && d.tp !== o.tp) { if (o.tp !== undefined) { FX.tpOut(o.x, o.y, o.z); o.x = d.x; o.y = d.y; o.z = d.z; o.f = d.f; FX.tpIn(o.x, o.y, o.z); Snd.teleport(); } o.tp = d.tp; }
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; G.whenCalm(() => endCard(false)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
+    else if (d.t === 'dodge' && d.to === Net.id() && lastHit && performance.now() - lastHit.t < 2500) {   // il a esquivé : le point est annulé
+      score = Math.max(0, score - lastHit.pts); const o = others.get(lastHit.id); if (o) o.fl = 0; lastHit = null; scoreKey = '';
+      G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos';
+    }
     else if (d.t === 'brk' && 'trw'.includes(d.k) && num(d.dx) && num(d.dz)) G.breakThing(d.k, d.i | 0, d.dx, d.dz, true);   // l'autre a cassé quelque chose
     else if (d.t === 'brks' && Array.isArray(d.l)) for (const b of d.l.slice(0, 600)) { if (Array.isArray(b) && 'trw'.includes(b[0])) World.breakIt(b[0], b[1] | 0, +b[2] || 1, +b[3] || 0); }
   }
@@ -75,7 +80,7 @@ const Duel = (() => {
     sendAcc += rdt;
     if (sendAcc > 0.066) {
       sendAcc = 0;
-      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score });
+      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0 });
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
@@ -112,7 +117,7 @@ const Duel = (() => {
       Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega });
       if (k.mega) { S.fury = 0; G.fireRay(o.x, o.y + 1.2, o.z, k.dx, k.dz); }
       if (!launch) { G.showHit('Trop mou', 'soft', []).verdict.textContent = 'Arme au moins à moitié pour l\'envoyer'; return true; }
-      score += pts; o.fl = 1; if (!k.mega) S.fury = Math.min(100, S.fury + 26);
+      score += pts; o.fl = 1; lastHit = { id: o.id, pts, t: performance.now() }; if (!k.mega) S.fury = Math.min(100, S.fury + 26);
       G.showHit(k.mega ? 'Désintégré' : sneaky ? 'Chassé surprise' : 'Chassé', k.mega ? 'mega' : '', tags.concat(pts > 1 ? '+2 points' : '+1 point')).verdict.textContent = `${score} à ${o.sc}`;
       if (score >= GOAL) { over = true; Net.send({ t: 'win', id: Net.id() }); G.whenCalm(() => endCard(true)); }
       return true;
@@ -122,6 +127,8 @@ const Duel = (() => {
   function takeHit(d) {
     const P = G.P; if (P.fly || !num(d.dx) || !num(d.dz)) return;
     const l = Math.hypot(d.dx, d.dz) || 1, dx = d.dx / l, dz = d.dz / l;
+    const a = others.get(d.id);
+    if (a && G.tryDodge({ x: a.x, z: a.z, f: a.f, rad: 0.6 })) { Net.send({ t: 'dodge', id: Net.id(), to: d.id }); return; }
     G.stopCharge(); P.kick = null;
     G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
     const el = $('hurt'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
@@ -150,18 +157,15 @@ const Duel = (() => {
   function draw(g, w, h) {
     const P = G.P;
     for (const o of others.values()) {
-      const dx = o.x - P.x, dz = o.z - P.z, d = Math.hypot(dx, dz), loud = o.sp && d < 40;
-      if (!o.vis && !loud) continue;
+      if (!o.vis) continue;
       const p = G.project(o.x, o.y + 2.9, o.z);
-      if (p.on && o.vis) {
+      if (p.on) {
         g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; g.strokeText('ADVERSAIRE', p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText('ADVERSAIRE', p.x, p.y);
-      } else if (d > 5) {
-        const e = G.edgePos(dx, dz, w, h, 38);
-        g.save(); g.translate(e.x, e.y); g.rotate(e.a); g.globalAlpha = o.vis ? 0.95 : 0.55 + 0.3 * Math.sin(G.S.rt * 10);
-        g.fillStyle = o.vis ? '#e8291c' : '#ffb53a'; g.strokeStyle = '#1b140c'; g.lineWidth = 2; g.beginPath(); g.moveTo(15, 0); g.lineTo(-8, -10); g.lineTo(-3, 0); g.lineTo(-8, 10); g.closePath(); g.fill(); g.stroke(); g.restore();
       }
     }
   }
 
-  return { init, start, update, hud, kickTest, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
+  // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
+  function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
+  return { init, start, update, hud, kickTest, threat, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
 })();
