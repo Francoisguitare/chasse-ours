@@ -243,7 +243,7 @@ h1 span { color: var(--amber); }
 .defi { font-size: 13px; opacity: .78; line-height: 1.15; }
 .title-btns, .pause-btns { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .ghost.off { opacity: .5; text-decoration: line-through; }
-#card { background: linear-gradient(180deg, rgba(10, 22, 16, .88), rgba(10, 22, 16, .96)); }
+#card { background: rgba(10, 22, 16, .97); z-index: 8; }
 .story-card { width: min(100%, 620px); display: flex; flex-direction: column; gap: 12px; align-items: flex-start; animation: tagIn .4s both; }
 .story-card .eyebrow { margin: 0; color: var(--amber); opacity: 1; font-weight: 700; font-size: 14px; }
 .story-card h2 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: clamp(32px, 7.5vw, 60px); line-height: .95; text-transform: uppercase; color: var(--cream); text-shadow: 0 .05em 0 var(--ember), 0 .1em 0 var(--ink); transform: rotate(-2deg); transform-origin: left bottom; text-wrap: balance; }
