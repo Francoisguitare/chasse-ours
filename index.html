@@ -35,6 +35,7 @@
         </div>
       </div>
       <div class="hearts" id="hearts" aria-label="Vie"></div>
+      <div class="gauge" id="hp-gauge"><span class="lab">Santé <b id="hp-text">100</b></span><div class="bar hp"><i id="hp-fill"></i></div></div>
       <div class="gauge" id="stamina-gauge"><span class="lab">Souffle</span><div class="bar stamina"><i id="stamina-fill"></i></div></div>
       <div class="gauge" id="fury-gauge"><span class="lab">Furie</span><div class="bar fury"><i id="fury-fill"></i></div></div>
     </div>
@@ -84,6 +85,7 @@
     <button id="t-crouch" type="button">Accroupi</button>
     <button id="t-jump" type="button">Saut</button>
     <button id="t-tp" type="button">Téléport</button>
+    <button id="t-focus" type="button">Furie</button>
     <button id="t-kick" type="button">Chassé</button>
   </div>
 
@@ -101,7 +103,8 @@
         <span><kbd>Maj</kbd> sprinter</span>
         <span><kbd>C</kbd> s'accroupir</span>
         <span><kbd>Espace</kbd> sauter, deux fois d'affilée</span>
-        <span><kbd>X</kbd> au moment où on te frappe : téléportation dans son dos (25 % de Furie)</span>
+        <span><kbd>X</kbd> maintenu : téléportation dans le dos de la cible en armant, relâcher pour frapper (25 % de Furie)</span>
+        <span><kbd>R</kbd> maintenu : recharger la Furie, immobile</span>
         <span><kbd>clic</kbd> ou <kbd>Entrée</kbd> maintenir pour armer, relâcher pour frapper</span>
         <span><kbd>clic droit</kbd> ou <kbd>A</kbd> <kbd>E</kbd> tourner la caméra, molette pour la distance</span>
       </div>
@@ -110,7 +113,8 @@
         <span>Pouce droit qui glisse : tourner la caméra</span>
         <span>Bouton Chassé : maintenir pour armer, relâcher pour frapper</span>
         <span>Bouton Saut : deux sauts d'affilée</span>
-        <span>Bouton Téléport, au moment où on te frappe : tu passes dans son dos</span>
+        <span>Téléport maintenu : dans son dos en armant, relâcher pour frapper</span>
+        <span>Furie maintenu : recharger la jauge</span>
       </div>
       <div class="title-btns">
         <button id="btn-play" type="button" class="cta">Entrer dans la plaine</button>

@@ -344,6 +344,23 @@ const Snd = (() => {
     v.connect(vg); vg.connect(sfxBus); vg.connect(revIn); v.start(t + 0.06); lfo.start(t + 0.06); v.stop(t + 0.34); lfo.stop(t + 0.34);
     nz(t, 0.09, 'highpass', 3000, 0.7, 0.35, null, 9000); nz(t + 0.005, 0.02, 'highpass', 5000, 0.7, 0.5);
   }
+  // concentration : un bourdonnement grave qui monte avec la jauge
+  let fo = null;
+  function focus(v) {
+    if (!ok()) return;
+    if (!fo) {
+      if (v <= 0) return;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+      o1.type = 'sawtooth'; o2.type = 'sawtooth'; o1.frequency.value = 62; o2.frequency.value = 93.4; lp.type = 'lowpass'; lp.Q.value = 5; lp.frequency.value = 300; g.gain.value = 0.0001;
+      l.frequency.value = 7; lg.gain.value = 0.03; l.connect(lg); lg.connect(g.gain);
+      const n = ctx.createBufferSource(); n.buffer = noise; n.loop = true; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 2400; nf.Q.value = 1.5; const ng = ctx.createGain(); ng.gain.value = 0.0001;
+      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(sfxBus); g.connect(revIn); n.connect(nf); nf.connect(ng); ng.connect(sfxBus);
+      [o1, o2, l, n].forEach(x => x.start()); fo = { o1, o2, lp, g, ng, v: 0 };
+    }
+    if (Math.abs(v - fo.v) < 0.02) return; fo.v = v; const t = now();
+    fo.g.gain.setTargetAtTime(0.0001 + 0.13 * v, t, 0.08); fo.ng.gain.setTargetAtTime(0.0001 + 0.05 * v, t, 0.08);
+    fo.lp.frequency.setTargetAtTime(300 + 1800 * v, t, 0.1); fo.o1.frequency.setTargetAtTime(62 + 40 * v, t, 0.1); fo.o2.frequency.setTargetAtTime(93.4 + 60 * v, t, 0.1);
+  }
   function parry() { if (!ok()) return; const t = now(); nz(t, 0.09, 'bandpass', 3200, 2, 0.6).connect(revIn); tone(t, 0.18, 'square', 520, 240, 0.14); tone(t, 0.25, 'sine', 120, 60, 0.4); }
   function miss() { if (!ok()) return; tone(now(), 0.25, 'triangle', 300, 160, 0.08); }
 
@@ -356,5 +373,5 @@ const Snd = (() => {
   function setMuted(v) { muted = v; if (ctx) master.gain.setTargetAtTime(v ? 0 : 0.9, now(), 0.03); }
   function suspend(v) { if (!ctx) return; if (v) ctx.suspend(); else ctx.resume(); }
 
-  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, teleport, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
+  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, teleport, focus, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
 })();

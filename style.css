@@ -270,6 +270,20 @@ h1 span { color: var(--amber); }
 #t-tp:active { background: #bff2ff; color: var(--ink); transform: scale(.94); }
 #t-tp.low { opacity: .38; box-shadow: none; }
 #game.compact #t-tp { width: 58px; height: 58px; font-size: 10px; right: calc(var(--gr) + 110px); bottom: max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px)); }
+#hp-gauge { display: none; }
+#game.duel #hp-gauge { display: grid; }
+#hp-gauge .lab b { color: var(--cream); font-variant-numeric: tabular-nums; }
+.bar.hp i { background: linear-gradient(90deg, #4fb83a, #a6e36a); }
+#hp-gauge.low .bar.hp i { background: linear-gradient(90deg, #c81e10, #ff6a4a); }
+#hp-gauge.low { animation: throb .4s infinite alternate; }
+#game.compact.duel #hp-gauge { flex-basis: 100%; background: none; border: 0; padding: 0; grid-template-columns: 120px; }
+#game.compact.duel #hp-gauge .bar { height: 7px; }
+#t-tp.down { background: #bff2ff; color: var(--ink); transform: scale(.94); }
+#t-focus { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 2px solid #ff8a6a; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; color: #ffe8e0;
+  right: calc(var(--gr) + 200px); bottom: max(22px, calc(env(safe-area-inset-bottom, 0px) + 14px)); width: 62px; height: 62px; background: rgba(120, 30, 20, .7); }
+#t-focus.on { background: #ff3b2b; color: #fff; box-shadow: 0 0 22px #ff3b2b; transform: scale(1.06); }
+#game.compact #t-focus { width: 54px; height: 54px; font-size: 10px; right: calc(var(--gr) + 180px); }
+#fury-gauge.focus { border-color: #ff3b2b; box-shadow: 0 0 16px rgba(255, 59, 43, .7); }
 /* rayon de Furie : le monde s'éteint et vire au rouge */
 #game.ray #tint { opacity: 1; }
 #game.ray #tint::after { opacity: 1; animation: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 40, 20, .12) 0%, rgba(110, 0, 0, .62) 70%, rgba(20, 0, 0, .9) 100%); transition: opacity .12s; }

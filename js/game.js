@@ -63,8 +63,8 @@
     hearts: 4, maxHearts: 4, stamina: 100, maxStamina: 100, winded: false, fury: 0, combo: 0, comboT: 0,
     power: 100, detectMul: 1, chargeRate: 1, furyMul: 1, reachMul: 1, mood: 'calm', pendingLevel: 0, timers: [], calmQ: [], counter: null, spawnT: 0, hintStep: 0, hintT: 0, moteAcc: 0, objT: 0, nearBear: false, fireAcc: 0,
   };
-  const P = { x: 0, y: 0, z: 6, vy: 0, tpWin: 0, tpN: 0, ground: true, climb: false, jumpBuf: 0, coyote: 0, jumps: 0, cut: true, fullT: 0, fly: null, vx: 0, vz: 0, face: Math.PI, crouch: false, crouchK: 0, charging: false, chargeT: 0, chargePose: 0, kickPose: 0, kick: null, recover: 0, hurtT: 0, invuln: 0, inGrass: false, hidden: false, sprinting: false, sprintK: 0, sprintT: 0, speed: 0, stepAcc: 0, regenDelay: 0, fullPing: false, auraAcc: 0 };
-  const I = { sx: 0, sz: 0, kick: false, stick: false, full: false, jumpHeld: false };
+  const P = { x: 0, y: 0, z: 6, vy: 0, tpWin: 0, tpRecent: 0, tpN: 0, focusing: false, focusAcc: 0, ground: true, climb: false, jumpBuf: 0, coyote: 0, jumps: 0, cut: true, fullT: 0, fly: null, vx: 0, vz: 0, face: Math.PI, crouch: false, crouchK: 0, charging: false, chargeT: 0, chargePose: 0, kickPose: 0, kick: null, recover: 0, hurtT: 0, invuln: 0, inGrass: false, hidden: false, sprinting: false, sprintK: 0, sprintT: 0, speed: 0, stepAcc: 0, regenDelay: 0, fullPing: false, auraAcc: 0 };
+  const I = { sx: 0, sz: 0, kick: false, focus: false, stick: false, full: false, jumpHeld: false };
   const keys = {};
   const bears = [];
   // caméra libre : yaw tourne autour du promeneur, pitch monte ou descend, uz rapproche
@@ -113,13 +113,14 @@
     if (e.code === 'Space') jumpDown();
     else if (e.code === 'Enter' || e.code === 'KeyK') kickDown();
     else if (e.code === 'KeyX' || e.code === 'KeyL') tpDown();
+    else if (e.code === 'KeyR') I.focus = true;
     else if (e.code === 'KeyC' || e.code === 'ControlLeft') toggleCrouch();
     else if (e.code === 'Escape' || e.code === 'KeyP') { if (S.running && (!S.modal || S.paused)) setPause(!S.paused); }
     else if (e.code === 'KeyM') toggleSound();
     else if (e.code === 'KeyF') toggleFS();
   });
-  addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Space') jumpUp(); else if (e.code === 'Enter' || e.code === 'KeyK') kickUp(); });
-  addEventListener('blur', () => { for (const k in keys) keys[k] = false; kickUp(); jumpUp(); });
+  addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Space') jumpUp(); else if (e.code === 'Enter' || e.code === 'KeyK' || e.code === 'KeyX' || e.code === 'KeyL') kickUp(); else if (e.code === 'KeyR') I.focus = false; });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; kickUp(); jumpUp(); I.focus = false; });
   // souris : clic gauche = chassé, clic droit maintenu = tourner la caméra, molette = distance
   let lookMouse = false, lmx = 0, lmy = 0;
   wrap.addEventListener('pointerdown', e => {
@@ -156,7 +157,13 @@
   const tkUp = () => { tk.classList.remove('down'); kickUp(); };
   tk.addEventListener('pointerup', tkUp); tk.addEventListener('pointercancel', tkUp);
   $('t-crouch').addEventListener('pointerdown', e => { e.preventDefault(); toggleCrouch(); });
-  $('t-tp').addEventListener('pointerdown', e => { e.preventDefault(); tpDown(); });
+  // Téléport : on le garde enfoncé pour continuer d'armer le chassé, on le relâche pour frapper
+  const ttp = $('t-tp');
+  ttp.addEventListener('pointerdown', e => { e.preventDefault(); try { ttp.setPointerCapture(e.pointerId); } catch (_) { /* rien */ } ttp.classList.add('down'); tpDown(); });
+  const ttpUp = () => { ttp.classList.remove('down'); kickUp(); }; ttp.addEventListener('pointerup', ttpUp); ttp.addEventListener('pointercancel', ttpUp);
+  const tf = $('t-focus');
+  tf.addEventListener('pointerdown', e => { e.preventDefault(); try { tf.setPointerCapture(e.pointerId); } catch (_) { /* rien */ } I.focus = true; });
+  const tfUp = () => { I.focus = false; }; tf.addEventListener('pointerup', tfUp); tf.addEventListener('pointercancel', tfUp);
   const tj = $('t-jump');
   tj.addEventListener('pointerdown', e => { e.preventDefault(); try { tj.setPointerCapture(e.pointerId); } catch (_) { /* rien */ } jumpDown(); });
   tj.addEventListener('pointerup', jumpUp); tj.addEventListener('pointercancel', jumpUp);
@@ -212,6 +219,8 @@
     const hk = S.hearts + '/' + S.maxHearts;
     if (H.hearts !== hk) { const prev = H.heartsN; H.hearts = hk; H.heartsN = S.hearts; let h = ''; for (let i = 0; i < S.maxHearts; i++) h += `<span class="${i < S.hearts ? (prev !== undefined && i >= prev ? 'pop' : '') : 'off'}">♥</span>`; $('hearts').innerHTML = h; }
     setW('stamina-fill', S.stamina / S.maxStamina); setW('fury-fill', S.fury / 100);
+    if (S.duel) { setW('hp-fill', S.hp / 100); setTxt('hp-text', Math.max(0, Math.round(S.hp)) + ''); setCls('hp-gauge', 'low', S.hp <= 30); }
+    setCls('t-focus', 'on', P.focusing); setCls('fury-gauge', 'focus', P.focusing);
     setCls('stamina-gauge', 'show', S.stamina < S.maxStamina - 0.5); setCls('stamina-gauge', 'winded', S.winded);
     setCls('fury-gauge', 'full', S.fury >= 100);
     const fr = Math.round(S.fury); if (H.furyRing !== fr) { H.furyRing = fr; tk.style.setProperty('--fury', fr); tk.classList.toggle('mega', fr >= 100); $('t-tp').classList.toggle('low', fr < TP_COST); }
@@ -349,9 +358,10 @@
     b.vis = vis;
     // un mur assez haut coupe la vue ; accroupi, un muret suffit
     const blk = d < 52 && World.blocked(b.x, b.z, P.x, P.z, P.crouch, P.y);
-    const close = P.y < 2.5 && d < b.rad + (P.hidden ? 0.5 : P.crouch ? 1.3 : 2.6);
+    b.blindT = Math.max(0, (b.blindT || 0) - dt);
+    const close = !b.blindT && P.y < 2.5 && d < b.rad + (P.hidden ? 0.5 : P.crouch ? 1.3 : 2.6);
     const seen = !blk && ((off < 0.95 && d < vis) || close);
-    const noise = P.sprinting ? 17 : (P.crouch || P.speed < 1) ? 0 : 5;
+    const noise = P.focusing ? 11 : P.sprinting ? 17 : (P.crouch || P.speed < 1) ? 0 : 5;
     const heard = d < noise * S.detectMul;
     switch (b.state) {
       case 'sleep':
@@ -530,26 +540,28 @@
   /* ---------- téléportation : au moment où on se fait taper, on réapparaît dans son dos ---------- */
   const TP_COST = 25;
   function tpDown() {
-    if (!playing() || P.fly) return;
+    if (!playing() || (P.fly && P.fly.ko)) return;
     if (S.fury < TP_COST) { banner('Pas assez de Furie<small>La téléportation coûte ' + TP_COST + ' %</small>', 'red', 1500); Snd.miss(); return; }
-    // une menace déjà lancée (patte armée, charge, adversaire qui arme) : on part tout de suite
-    let th = null, bd = 9;
-    for (const b of bears) { if (b.state === 'launched') continue; const d = Math.hypot(b.x - P.x, b.z - P.z); if (((b.state === 'attack' && !b.struck) || b.state === 'bwind' || b.state === 'bcharge') && d < bd) { bd = d; th = { x: b.x, z: b.z, f: b.face, rad: b.rad, bear: b }; } }
-    if (!th && S.duel) th = Duel.threat();
-    if (th) teleportBehind(th); else P.tpWin = 0.4;   // sinon, la fenêtre reste ouverte un court instant
+    // la cible : l'adversaire en duel, sinon l'ours le plus proche, où qu'il soit sur la carte
+    let th = null;
+    if (S.duel) th = Duel.nearest();
+    else { let bd = 1e9; for (const b of bears) { if (b.state === 'launched') continue; const d = Math.hypot(b.x - P.x, b.z - P.z); if (d < bd) { bd = d; th = { x: b.x, z: b.z, f: b.face, rad: b.rad, bear: b }; } } }
+    if (!th) { banner('Personne à surprendre<small>Aucun adversaire en vue</small>', '', 1500); Snd.miss(); return; }
+    teleportBehind(th);
+    I.kick = true; P.recover = 0;   // on arrive en position de chassé : tant que le bouton reste enfoncé, on arme
   }
   function teleportBehind(t) {
-    S.fury = Math.max(0, S.fury - TP_COST); P.tpWin = 0; P.tpN = (P.tpN || 0) + 1;
+    S.fury = Math.max(0, S.fury - TP_COST); P.tpWin = 0; P.tpRecent = 0.4; P.tpN = (P.tpN || 0) + 1; P.fly = null; pm.pose.rotation.x = 0;
     FX.tpOut(P.x, P.y, P.z);
     const back = t.rad + 1.7; P.x = t.x - Math.sin(t.f) * back; P.z = t.z - Math.cos(t.f) * back; collide(P, 0.45, 0);
     P.y = World.groundAt(P.x, P.z, 6); P.vy = 0; P.vx = P.vz = 0; P.face = t.f; P.hurtT = 0; P.kick = null; stopCharge(); P.invuln = Math.max(P.invuln, 0.7); P.ground = true; P.climb = false;
     FX.tpIn(P.x, P.y, P.z); Snd.teleport(); S.hitstop = Math.max(S.hitstop, 0.05); cam.punch = Math.max(cam.punch, 0.45);
     // l'ours a frappé dans le vide : une seconde de flottement, et il ne te voit plus (chassé furtif possible)
-    if (t.bear) { const b = t.bear; b.state = 'idle'; b.st = 1.1; b.aware = 0.35; b.sp = 0; }
+    if (t.bear) { const b = t.bear; if (b.state !== 'sleep' && b.state !== 'stunned') { b.state = 'idle'; b.st = 1.6; } b.aware = 0.2; b.sp = 0; b.blindT = 1.8; }
     const p = project(P.x, P.y + 2.6, P.z); floatText('Téléporté', p.x, p.y, 'amber');
   }
   // appelé quand un coup arrive : si la fenêtre est ouverte, on esquive
-  function tryDodge(t) { if (P.tpWin > 0 && S.fury >= TP_COST && !P.fly) { teleportBehind(t); return true; } return false; }
+  function tryDodge() { return P.tpRecent > 0; }   // on vient de se téléporter : le coup frappe le vide
   // le fracas réveille les voisins
   function wakeAround(x, z, r, src) {
     for (const o of bears) { if (o === src || o.state === 'launched') continue; if (Math.hypot(o.x - x, o.z - z) < r) { o.aware = Math.max(o.aware, 0.55); if (o.state === 'idle' || o.state === 'wander') o.face += angDiff(o.face, Math.atan2(P.x - o.x, P.z - o.z)) * 0.6; } }
@@ -661,7 +673,7 @@
     }
   }
   function hurtPlayer(b, dmg) {
-    if (tryDodge({ x: b.x, z: b.z, f: b.face, rad: b.rad, bear: b })) return;
+    if (tryDodge()) return;
     S.hearts -= dmg; P.hurtT = 0.45; P.invuln = 1.5; S.combo = 0; S.comboT = 0;
     const a = Math.atan2(P.x - b.x, P.z - b.z); P.vx = Math.sin(a) * (14 + 4 * dmg); P.vz = Math.cos(a) * (14 + 4 * dmg);
     stopCharge(); P.kick = null;
@@ -690,12 +702,20 @@
       Duel.flyStep(dt); P.invuln = Math.max(P.invuln, 0.1); pm.root.position.set(P.x, P.y, P.z); pm.root.visible = true; if (P.fly) pm.pose.rotation.x += 12 * dt;
       P.speed = 0; P.sprinting = false; P.sprintK = 0; Snd.setRush(0); FX.rush = 0; chargeRing.visible = aimRing.visible = false; return;
     }
-    P.tpWin = Math.max(0, P.tpWin - dt); P.invuln = Math.max(0, P.invuln - dt); P.recover = Math.max(0, P.recover - dt); P.hurtT = Math.max(0, P.hurtT - dt);
+    P.tpWin = Math.max(0, P.tpWin - dt); P.tpRecent = Math.max(0, P.tpRecent - dt); P.invuln = Math.max(0, P.invuln - dt); P.recover = Math.max(0, P.recover - dt); P.hurtT = Math.max(0, P.hurtT - dt);
     // les directions suivent la caméra : « haut » = là où elle regarde
     const ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + I.sx, iz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + I.sz;
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
     let mx = ix * cy + iz * sy, mz = -ix * sy + iz * cy, ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; ml = 1; }
     const canAct = !P.kick && P.recover <= 0 && P.hurtT <= 0;
+    // concentration : on reste planté, la Furie monte doucement, et ça s'entend de loin
+    P.focusing = I.focus && canAct && !P.charging && !I.kick && P.ground && S.fury < 100;
+    if (P.focusing) {
+      S.fury = Math.min(100, S.fury + 14 * dt);
+      P.focusAcc += dt * 34; while (P.focusAcc > 1) { P.focusAcc--; FX.aura(P.x, P.y + 1, P.z, S.fury / 100, true); }
+      if (S.fury >= 100) { Snd.perfect(); FX.ring(P.x, P.z, 0xff3b2b, 5, 0.4, P.y + 0.2, 0.9); }
+    }
+    Snd.focus(P.focusing ? 0.3 + 0.7 * S.fury / 100 : 0);
     if (I.kick && !P.charging && canAct) { P.charging = true; P.chargeT = 0; P.fullPing = false; Snd.chargeStart(); }
     if (P.charging) {
       P.chargeT += dt * S.chargeRate;
@@ -716,7 +736,7 @@
         if (!was) { P.sprintT = 0; FX.dust(P.x, P.z, 8, 5); Snd.whoosh(0.35); cam.punch = Math.max(cam.punch, 0.35); }   // le coup de rein du départ
         P.sprintT += dt; max = lerp(CFG.walk * 1.4, CFG.sprint, Math.min(1, P.sprintT / 0.55));   // l'élan se prend en une demi-seconde
       }
-      if (P.charging) max = CFG.chargeMove; if (P.recover > 0) max *= 0.35;
+      if (P.charging) max = CFG.chargeMove; if (P.recover > 0) max *= 0.35; if (P.focusing) max = 0;
       const acc = P.ground || P.climb ? (P.sprinting ? 16 : 12) : 7;   // en l'air, on garde son élan
       P.vx = damp(P.vx, mx * max, acc, dt); P.vz = damp(P.vz, mz * max, acc, dt);
       if (ml > 0.1) P.face += angDiff(P.face, Math.atan2(mx, mz)) * Math.min(1, dt * (P.charging ? 7 : 14));
@@ -762,7 +782,7 @@
     P.kickPose = damp(P.kickPose, P.kick ? 1 : 0, P.kick ? 45 : 9, dt);
     pm.root.position.set(P.x, P.y, P.z); pm.root.rotation.y = P.face;
     pm.root.visible = !(P.invuln > 0 && P.hurtT <= 0 && Math.floor(S.rt * 18) % 2 === 0 && S.hearts > 0);
-    Actors.animPlayer(pm, { speed: P.speed, crouch: P.crouchK, charge: P.chargePose, kick: P.kickPose, sprint: P.sprintK, climb: P.climb, air: !P.ground && !P.climb, mega: S.fury >= 100 }, dt, S.rt);
+    Actors.animPlayer(pm, { speed: P.speed, crouch: P.crouchK, charge: Math.max(P.chargePose, P.focusing ? 0.45 : 0), kick: P.kickPose, sprint: P.sprintK, climb: P.climb, air: !P.ground && !P.climb, mega: S.fury >= 100 }, dt, S.rt);
     Snd.setRush(P.sprintK); FX.rush = P.sprintK;
     // repères au sol : cercle d'armé, cible visée
     const c = P.charging ? Math.min(1, P.chargeT / CFG.chargeTime) : 0;
@@ -800,7 +820,7 @@
     () => coarse ? 'Fonce sur un mur pour le grimper. Bouton <b>Saut</b> : deux sauts d\'affilée. Perché, les ours ne peuvent pas t\'atteindre.' : 'Fonce sur un mur pour le grimper. <kbd>Espace</kbd> pour sauter, deux fois d\'affilée. Perché, les ours ne peuvent pas t\'atteindre.',
     () => coarse ? 'Maintiens <b>Chassé</b> pour armer, relâche pour frapper.' : 'Maintiens le <kbd>clic</kbd> ou <kbd>Entrée</kbd> pour armer ton chassé, relâche pour frapper. Ça marche aussi sur les arbres et les murs.',
     () => coarse ? 'Bouton <b>Accroupi</b> dans les hautes herbes : les ours ne te voient plus.' : 'Accroupis-toi avec <kbd>C</kbd> dans les hautes herbes : les ours ne te voient plus.',
-    () => coarse ? 'Bouton <b>Téléport</b> au moment où on te frappe : tu réapparais dans son dos. Ça coûte un quart de Furie.' : 'Touche <kbd>X</kbd> au moment où on te frappe : tu réapparais dans son dos. Ça coûte un quart de Furie.',
+    () => coarse ? 'Maintiens <b>Téléport</b> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <b>Furie</b> pour la recharger.' : 'Maintiens <kbd>X</kbd> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <kbd>R</kbd> pour la recharger.',
     () => 'Le cône au sol montre ce que l\'ours voit. Arrive par derrière : un ours surpris encaisse le double.',
     () => 'Relâche pile quand la jauge flashe en blanc : armé parfait, +30 % de puissance.',
   ];
@@ -987,7 +1007,7 @@
       S.hintT = 1.2; if (S.kicked >= 3) S.hintStep = HINTS.length;
       const cp = Story.checkpoint(); P.x = cp[0]; P.z = cp[1]; Story.begin();
     } else {   // duel : pas d'ours, pas d'histoire, juste les ruines et l'autre
-      S.duel = true; wrap.classList.add('duel'); while (bears.length) removeBear(bears[0]);
+      S.duel = true; S.hp = 100; wrap.classList.add('duel'); while (bears.length) removeBear(bears[0]);
       S.hintStep = HINTS.length; S.fury = 0; S.stamina = S.maxStamina; World.setDusk(0); Duel.start(mode, joinCode);
     }
     // sur téléphone, on tente le plein écran d'office : s'il est refusé, le jeu continue tel quel

@@ -2,7 +2,7 @@
 const Duel = (() => {
   'use strict';
   let G, lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
-  const GOAL = 7, others = new Map(), $ = id => document.getElementById(id);
+  const GOAL = 5, others = new Map(), $ = id => document.getElementById(id);
   const ARENA = { x: 10, z: -95, r: 54 };
   const SPAWNS = [[10, -66], [21, -119], [-4, -96], [20.5, -82]];
   const COLORS = [[0x2f6fb5, 0x265d99], [0x8a3fb0, 0x733494], [0x1f9a8a, 0x1a8071]];
@@ -61,14 +61,16 @@ const Duel = (() => {
       d.y = num(d.y) ? d.y : 0;
       const o = others.get(d.id) || add(d.id, d), now = performance.now(), gap = Math.max(0.03, (now - o.seen) / 1000);
       o.v = Math.hypot(d.x - o.tx, d.z - o.tz) / gap; o.seen = now; o.tx = d.x; o.ty = d.y; o.tz = d.z; o.tf = d.f;
-      o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0;
+      o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0; o.hp = num(d.hp) ? U.clamp(d.hp, 0, 100) : 100;
       if (num(d.tp) && d.tp !== o.tp) { if (o.tp !== undefined) { FX.tpOut(o.x, o.y, o.z); o.x = d.x; o.y = d.y; o.z = d.z; o.f = d.f; FX.tpIn(o.x, o.y, o.z); Snd.teleport(); } o.tp = d.tp; }
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; G.whenCalm(() => endCard(false)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
-    else if (d.t === 'dodge' && d.to === Net.id() && lastHit && performance.now() - lastHit.t < 2500) {   // il a esquivé : le point est annulé
-      score = Math.max(0, score - lastHit.pts); const o = others.get(lastHit.id); if (o) o.fl = 0; lastHit = null; scoreKey = '';
-      G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos';
+    else if (d.t === 'dodge' && d.to === Net.id()) { G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos'; }
+    else if (d.t === 'ko' && d.to === Net.id() && !over) {   // c'est la victime qui annonce le K.-O. : elle seule connaît sa santé
+      score += d.pts === 2 ? 2 : 1; scoreKey = ''; Snd.levelUp();
+      G.banner(`${d.pts === 2 ? 'Désintégré' : 'K.-O.'}<small>+${d.pts === 2 ? 2 : 1} · ${score} à ${best() ? best().sc : 0}</small>`, '', 2400);
+      if (score >= GOAL) { over = true; Net.send({ t: 'win', id: Net.id() }); G.whenCalm(() => endCard(true)); }
     }
     else if (d.t === 'brk' && 'trw'.includes(d.k) && num(d.dx) && num(d.dz)) G.breakThing(d.k, d.i | 0, d.dx, d.dz, true);   // l'autre a cassé quelque chose
     else if (d.t === 'brks' && Array.isArray(d.l)) for (const b of d.l.slice(0, 600)) { if (Array.isArray(b) && 'trw'.includes(b[0])) World.breakIt(b[0], b[1] | 0, +b[2] || 1, +b[3] || 0); }
@@ -80,7 +82,7 @@ const Duel = (() => {
     sendAcc += rdt;
     if (sendAcc > 0.066) {
       sendAcc = 0;
-      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0 });
+      Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp) });
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
@@ -111,15 +113,15 @@ const Duel = (() => {
     if (over) return false;
     for (const o of others.values()) {
       if (o.fl || o.inv || Math.hypot(o.x - fx, o.z - fz) > 1.5 || Math.abs(o.y - G.P.y) > 2.8) continue;
-      const S = G.S, back = Math.sin(o.f) * k.dx + Math.cos(o.f) * k.dz > 0.45, launch = k.c >= 0.5 || k.mega, sneaky = k.ambush || back, pts = launch ? (sneaky ? 2 : 1) : 0;
+      const S = G.S, back = Math.sin(o.f) * k.dx + Math.cos(o.f) * k.dz > 0.45, launch = k.c >= 0.5 || k.mega, sneaky = k.ambush || back;
+      const dmg = k.mega ? 999 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1));
       const tags = []; if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
       G.impactFX(dummy(o.x, o.z), k, U.clamp(0.4 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0), 0.3, 1.6), !!k.mega, launch);
-      Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega });
+      Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega, dmg });
       if (k.mega) { S.fury = 0; G.fireRay(o.x, o.y + 1.2, o.z, k.dx, k.dz); }
-      if (!launch) { G.showHit('Trop mou', 'soft', []).verdict.textContent = 'Arme au moins à moitié pour l\'envoyer'; return true; }
-      score += pts; o.fl = 1; lastHit = { id: o.id, pts, t: performance.now() }; if (!k.mega) S.fury = Math.min(100, S.fury + 26);
-      G.showHit(k.mega ? 'Désintégré' : sneaky ? 'Chassé surprise' : 'Chassé', k.mega ? 'mega' : '', tags.concat(pts > 1 ? '+2 points' : '+1 point')).verdict.textContent = `${score} à ${o.sc}`;
-      if (score >= GOAL) { over = true; Net.send({ t: 'win', id: Net.id() }); G.whenCalm(() => endCard(true)); }
+      if (!k.mega) S.fury = Math.min(100, S.fury + (launch ? 18 : 6));
+      const left = Math.max(0, (o.hp === undefined ? 100 : o.hp) - dmg);
+      G.showHit(k.mega ? 'Désintégré' : !launch ? 'Touché' : sneaky ? 'Chassé surprise' : 'Chassé', k.mega ? 'mega' : launch ? '' : 'soft', tags.concat(k.mega ? 'Fatal' : '−' + dmg)).verdict.textContent = k.mega || left <= 0 ? 'K.-O.' : `Il lui reste ${left} de santé`;
       return true;
     }
     return false;
@@ -133,17 +135,27 @@ const Duel = (() => {
     G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
     const el = $('hurt'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
     if (d.mega) G.fireRay(P.x, (P.y || 0) + 1.2, P.z, dx, dz, true);
-    if (d.launch) { P.fly = { t: 0, vx: dx * 19, vz: dz * 19, vy: 15, by: d.id }; P.crouch = false; $('t-crouch').classList.remove('on'); G.showHit('Envoyé', 'soft', []).verdict.textContent = 'Tu réapparais dans un instant'; }
-    else { P.vx = dx * 13; P.vz = dz * 13; P.hurtT = 0.4; }
+    const S = G.S; S.hp = d.mega ? 0 : Math.max(0, S.hp - (num(d.dmg) ? U.clamp(d.dmg, 0, 999) : 20));
+    if (S.hp <= 0) {   // K.-O. : je l'annonce, je pars en vol, je reviens à neuf
+      const pts = d.mega ? 2 : 1; Net.send({ t: 'ko', id: Net.id(), to: d.id, pts });
+      P.fly = { t: 0, vx: dx * 22, vz: dz * 22, vy: 16, by: d.id, ko: true }; P.crouch = false; $('t-crouch').classList.remove('on');
+      G.showHit(d.mega ? 'Désintégré' : 'K.-O.', 'soft', []).verdict.textContent = 'Tu réapparais dans un instant';
+    } else if (d.launch) {   // projeté mais debout : Téléport pendant le vol pour contre-attaquer
+      P.fly = { t: 0, vx: dx * 17, vz: dz * 17, vy: 12, by: d.id }; P.crouch = false; $('t-crouch').classList.remove('on');
+      G.showHit('Projeté', 'soft', ['−' + Math.round(d.dmg || 0)]).verdict.textContent = 'Téléport pour revenir dans son dos';
+    } else { P.vx = dx * 13; P.vz = dz * 13; P.hurtT = 0.4; }
   }
   // le vol plané de celui qui vient d'en prendre un
   function flyStep(dt) {
     const P = G.P, f = P.fly; f.t += dt; P.x += f.vx * dt; P.z += f.vz * dt; P.y = Math.max(0, (P.y || 0) + f.vy * dt); f.vy -= 22 * dt; clamp(P);
     if (dt > 0) FX.trail(P.x, P.y + 1, P.z, false);
-    if (f.t > 1.6) {
+    if (!f.ko && f.t > 0.3 && f.vy < 0 && P.y <= World.groundAt(P.x, P.z, P.y)) {   // simple projection : on retombe et on continue
+      P.fly = null; P.y = World.groundAt(P.x, P.z, P.y); P.vy = 0; P.hurtT = 0.3; P.vx = f.vx * 0.3; P.vz = f.vz * 0.3; G.pm.pose.rotation.x = 0; FX.dust(P.x, P.z, 12, 6); Snd.thud(); return;
+    }
+    if (f.ko && f.t > 1.6) {
       const a = others.get(f.by); let bi = 0, bd = -1;
       SPAWNS.forEach((s, i) => { const dd = a ? Math.hypot(s[0] - a.x, s[1] - a.z) : Math.random(); if (dd > bd) { bd = dd; bi = i; } });
-      place(bi); P.invuln = 2.5; G.S.stamina = G.S.maxStamina;
+      place(bi); P.invuln = 2.5; G.S.stamina = G.S.maxStamina; G.S.hp = 100;
     }
   }
   function clamp(o) { const dx = o.x - ARENA.x, dz = o.z - ARENA.z, d = Math.hypot(dx, dz); if (d > ARENA.r) { o.x = ARENA.x + dx / d * ARENA.r; o.z = ARENA.z + dz / d * ARENA.r; } }
@@ -151,7 +163,7 @@ const Duel = (() => {
     const b = best();
     G.card({ eyebrow: 'Duel terminé', title: won ? 'Victoire' : 'Défaite', paras: [`${score} à ${b ? b.sc : 0}. ${won ? 'Ton adversaire est parti voir les montagnes de près.' : 'Tu as vu les montagnes de près. Cache-toi mieux, frappe dans le dos.'}`], button: 'Revanche' }, () => { Net.send({ t: 'again' }); reset(); });
   }
-  function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(role === 'host' ? 0 : 1); G.P.invuln = 2; G.S.fury = 0; scoreKey = ''; }
+  function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(role === 'host' ? 0 : 1); G.P.invuln = 2; G.S.fury = 0; G.S.hp = 100; scoreKey = ''; }
 
   // par-dessus la 3D : étiquette de l'adversaire visible, flèche s'il est hors champ ou s'il fait du bruit
   function draw(g, w, h) {
@@ -161,11 +173,13 @@ const Duel = (() => {
       const p = G.project(o.x, o.y + 2.9, o.z);
       if (p.on) {
         g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; g.strokeText('ADVERSAIRE', p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText('ADVERSAIRE', p.x, p.y);
+        const hp = o.hp === undefined ? 100 : o.hp, bw = 56; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(p.x - bw / 2 - 1, p.y + 9, bw + 2, 7); g.fillStyle = hp > 30 ? '#7fd85a' : '#ff4f3a'; g.fillRect(p.x - bw / 2, p.y + 10, bw * hp / 100, 5);
       }
     }
   }
 
   // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
+  function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
   function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
-  return { init, start, update, hud, kickTest, threat, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
+  return { init, start, update, hud, kickTest, threat, nearest, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
 })();
