@@ -144,7 +144,7 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   text-shadow: 0 .05em 0 var(--ember), 0 .1em 0 var(--ink), 0 0 .5em rgba(255, 120, 20, .9);
   transform: rotate(-5deg) skewX(-6deg); animation: slam .34s cubic-bezier(.2, 1.6, .4, 1) both;
 }
-.hit.mega .hit-title { color: #dffaff; text-shadow: 0 .05em 0 #18a8d8, 0 .1em 0 var(--ink), 0 0 .6em rgba(80, 220, 255, 1); }
+.hit.mega .hit-title { color: #fff0e8; text-shadow: 0 .05em 0 #c81e10, 0 .1em 0 var(--ink), 0 0 .6em rgba(255, 60, 30, 1); }
 .hit.soft .hit-title { font-size: clamp(24px, 5.5vw, 48px); color: #e9dcc0; text-shadow: 0 .06em 0 var(--ink); }
 @keyframes slam { from { transform: rotate(-5deg) skewX(-6deg) scale(3.2); opacity: 0; } to { transform: rotate(-5deg) skewX(-6deg) scale(1); opacity: 1; } }
 @keyframes hitOut { to { opacity: 0; transform: translateX(-50%) translateY(-24px); } }
@@ -168,8 +168,8 @@ button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 #charge.perfect .charge-track { border-color: #fff; box-shadow: 0 0 22px #fff, 0 0 44px var(--amber); }
 #charge.perfect .charge-track i { background: #fff; }
 #charge.perfect #charge-label { color: #fff; }
-#charge.mega .charge-track i { background: linear-gradient(90deg, #7fe9ff, #fff); }
-#charge.mega #charge-label { color: #9ff0ff; }
+#charge.mega .charge-track i { background: linear-gradient(90deg, #ff3b2b, #fff); }
+#charge.mega #charge-label { color: #ff9a7a; }
 
 #hint {
   position: absolute; left: 50%; bottom: max(70px, 16%); transform: translateX(-50%); max-width: min(88vw, 520px); text-align: center;
@@ -181,7 +181,7 @@ kbd { font: inherit; font-weight: 700; background: var(--cream); color: var(--in
 /* ---------- Tactile ---------- */
 #touch { position: absolute; inset: 0; pointer-events: none; }
 #stick-zone { position: absolute; left: 0; top: 22%; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
-#stick-base { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba(255, 243, 212, .5); background: rgba(16, 35, 26, .35); }
+#stick-base { position: absolute; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 50%; border: 2px solid rgba(255, 243, 212, .5); background: rgba(16, 35, 26, .35); }
 #stick-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(255, 243, 212, .85); }
 #t-kick, #t-crouch { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid var(--cream); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 #t-kick { right: calc(var(--gr) + 4px); bottom: max(26px, calc(env(safe-area-inset-bottom, 0px) + 18px)); width: 104px; height: 104px; background: rgba(255, 90, 31, .82); font-family: var(--f-display); font-size: 17px; text-shadow: 0 2px 0 var(--ink); }
@@ -253,7 +253,22 @@ h1 span { color: var(--amber); }
   background: conic-gradient(var(--amber) calc(var(--fury, 0) * 1%), rgba(0, 0, 0, .4) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
 }
-#t-kick.mega::before { background: #7fe9ff; box-shadow: 0 0 22px #7fe9ff; animation: throb .4s infinite alternate; }
+#t-kick.mega::before { background: #ff3b2b; box-shadow: 0 0 22px #ff3b2b; animation: throb .4s infinite alternate; }
+
+/* manette : l'anneau intérieur marque la limite de la marche, le bord extérieur déclenche le sprint */
+#stick-base::after { content: ""; position: absolute; inset: 10%; border-radius: 50%; border: 1px dashed rgba(255, 243, 212, .45); }
+#stick-base.full { border-color: var(--amber); box-shadow: 0 0 18px rgba(255, 181, 58, .7); }
+#stick-base.full #stick-knob { background: var(--amber); }
+#t-jump { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid var(--cream); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 14px;
+  right: calc(var(--gr) + 118px); bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px)); width: 78px; height: 78px; background: rgba(47, 93, 58, .78); }
+#t-jump:active { background: var(--leaf); color: var(--ink); transform: scale(.94); }
+#t-crouch { right: calc(var(--gr) + 14px); bottom: max(146px, calc(env(safe-area-inset-bottom, 0px) + 138px)); width: 62px; height: 62px; }
+#game.compact #t-jump { width: 68px; height: 68px; font-size: 12px; right: calc(var(--gr) + 104px); border-width: 2px; background: rgba(47, 93, 58, .6); }
+#game.compact #t-crouch { right: calc(var(--gr) + 14px); bottom: max(126px, calc(env(safe-area-inset-bottom, 0px) + 118px)); width: 54px; height: 54px; font-size: 10px; }
+/* rayon de Furie : le monde s'éteint et vire au rouge */
+#game.ray #tint { opacity: 1; }
+#game.ray #tint::after { opacity: 1; animation: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 40, 20, .12) 0%, rgba(110, 0, 0, .62) 70%, rgba(20, 0, 0, .9) 100%); transition: opacity .12s; }
+@media (pointer: fine) { #game.ray #c3d { filter: saturate(1.5) contrast(1.25) !important; } }
 
 /* ---------- Duel ---------- */
 #duel-score { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-display); font-size: clamp(15px, 3.4vw, 22px); color: var(--cream); text-shadow: 0 2px 0 var(--ember), 0 4px 0 var(--ink); }
@@ -294,7 +309,7 @@ body.touch #game.compact #fury-gauge { display: none; }
 #game.compact #banner { top: 72px; font-size: clamp(15px, 4.4vw, 22px); white-space: normal; width: 92vw; }
 #game.compact #t-kick { width: 88px; height: 88px; font-size: 15px; background: rgba(255, 90, 31, .62); border-width: 2px; }
 #game.compact #t-kick.down { background: #fff; }
-#game.compact #t-crouch { width: 60px; height: 60px; font-size: 11px; right: calc(var(--gr) + 104px); background: rgba(16, 35, 26, .5); border-width: 2px; }
+#game.compact #t-crouch { background: rgba(16, 35, 26, .5); border-width: 2px; }
 #game.compact #t-crouch.on { background: rgba(60, 130, 50, .85); }
 #game.compact #hint { font-size: 15px; padding: 6px 10px; }
 #game.compact #combo { top: 34%; }

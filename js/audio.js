@@ -1,7 +1,7 @@
 /* Chassé d'Ours — son. Tout est synthétisé en WebAudio : nappes, arpèges, nature, bruitages d'impact. */
 const Snd = (() => {
   'use strict';
-  let ctx = null, master, musicBus, musicLP, sfxBus, revIn, noise, padLP, arpBus, natureBus;
+  let ctx = null, master, musicBus, musicLP, sfxBus, revIn, echoIn, noise, padLP, arpBus, natureBus;
   let mood = 'calm', muted = false, step = 0, nextT = 0, chord = 0, ch = null, rushG = null, rushF = null, rushK = 0;
   const pads = new Set();
   const STEP = 0.125;
@@ -32,6 +32,10 @@ const Snd = (() => {
     revIn = ctx.createGain(); revIn.connect(rev);
     const revOut = ctx.createGain(); revOut.gain.value = 0.5; rev.connect(revOut); revOut.connect(master);
 
+    // méga écho : une ligne à retard qui se renvoie la balle, noyée dans la réverbération
+    echoIn = ctx.createGain(); const eD = ctx.createDelay(1.5), eF = ctx.createGain(), eLP = ctx.createBiquadFilter(), eO = ctx.createGain();
+    eD.delayTime.value = 0.36; eF.gain.value = 0.66; eLP.type = 'lowpass'; eLP.frequency.value = 2400; eO.gain.value = 0.7;
+    echoIn.connect(eD); eD.connect(eLP); eLP.connect(eF); eF.connect(eD); eLP.connect(eO); eO.connect(master); eO.connect(revIn);
     musicLP = ctx.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 18000;
     musicBus = ctx.createGain(); musicBus.gain.value = 0.85; musicBus.connect(musicLP); musicLP.connect(master);
     const mRev = ctx.createGain(); mRev.gain.value = 0.45; musicLP.connect(mRev); mRev.connect(revIn);
@@ -282,11 +286,49 @@ const Snd = (() => {
     if (!ok()) return;
     const t = now();
     nz(t, 0.06, 'highpass', 1400, 0.7, 1.0).connect(revIn); nz(t + 0.085, 0.07, 'highpass', 900, 0.7, 0.9).connect(revIn);
-    tone(t, 1.4, 'sine', 110, 26, 1.0); tone(t + 0.085, 0.9, 'triangle', 190, 40, 0.5);
+    tone(t, 1.4, 'sine', 110, 26, 1.0).connect(echoIn); tone(t + 0.085, 0.9, 'triangle', 190, 40, 0.5);
     nz(t + 0.05, 2.6, 'lowpass', 220, 0.5, 0.7, null, 40).connect(revIn);
     if (tier >= 3) nz(t + 0.1, 1.6, 'bandpass', 900, 0.8, 0.3, null, 2600).connect(revIn);
     if (tier >= 4) [74, 81, 86].forEach((m, i) => tone(t + 0.15 + i * 0.05, 2.2, 'sine', mtof(m), mtof(m), 0.07).connect(revIn));
     musicBus.gain.cancelScheduledValues(t); musicBus.gain.setValueAtTime(0.15, t); musicBus.gain.linearRampToValueAtTime(0.85, t + 1.8);
+  }
+  /* ---------- saut, casse, rayon ---------- */
+  function jump(p) { if (!ok()) return; const t = now(); tone(t, 0.13, 'sine', 210 * p, 430 * p, 0.12, null, 0.01); nz(t, 0.1, 'bandpass', 900, 1, 0.1, null, 2400); }
+  function thud() { if (!ok()) return; const t = now(); tone(t, 0.22, 'sine', 130, 48, 0.7); nz(t, 0.08, 'lowpass', 900, 0.7, 0.4); }
+  function treeCrack(v) {
+    if (!ok()) return; const t = now();
+    for (let i = 0; i < 4; i++) nz(t + i * 0.035 + Math.random() * 0.03, 0.045, 'highpass', 1500 + Math.random() * 1500, 0.7, 0.8 * v).connect(revIn);   // le bois qui éclate
+    tone(t, 0.3, 'triangle', 240, 60, 0.6 * v);
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(190, t + 0.08); o.frequency.exponentialRampToValueAtTime(55, t + 0.9);   // le tronc qui gémit en basculant
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 620; f.Q.value = 6;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t + 0.08); g.gain.linearRampToValueAtTime(0.16 * v, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+    o.connect(f); f.connect(g); g.connect(sfxBus); g.connect(revIn); o.start(t + 0.08); o.stop(t + 1);
+  }
+  function treeDown(v) { if (!ok()) return; const t = now(); tone(t, 0.6, 'sine', 95, 28, 0.9 * v); nz(t, 0.25, 'lowpass', 500, 0.7, 0.6 * v).connect(revIn); nz(t + 0.03, 0.8, 'bandpass', 3200, 0.7, 0.2 * v, null, 1500).connect(revIn); }
+  function rockBreak(v) {
+    if (!ok()) return; const t = now();
+    nz(t, 0.05, 'highpass', 2200, 0.7, 0.9 * v).connect(revIn); nz(t, 0.35, 'lowpass', 1600, 0.7, 0.8 * v, null, 300).connect(revIn); tone(t, 0.4, 'sine', 120, 38, 0.8 * v);
+    for (let i = 0; i < 7; i++) nz(t + 0.08 + Math.random() * 0.5, 0.03, 'bandpass', 1800 + Math.random() * 2500, 3, 0.25 * v);   // les éclats qui retombent
+  }
+  function wallBreak(v) {
+    if (!ok()) return; const t = now();
+    tone(t, 0.9, 'sine', 100, 24, 1.0 * v); nz(t, 0.06, 'highpass', 1200, 0.7, 0.8 * v).connect(revIn);
+    nz(t, 1.3, 'lowpass', 420, 0.6, 0.9 * v, null, 70).connect(revIn);   // l'éboulement
+    for (let i = 0; i < 12; i++) nz(t + 0.1 + Math.random() * 0.9, 0.04, 'bandpass', 900 + Math.random() * 2200, 2.5, 0.3 * v);
+  }
+  // le rayon de Furie : aspiration, déflagration, puis un écho qui n'en finit pas
+  function ray() {
+    if (!ok()) return; const t = now();
+    const sw = nz(t, 0.22, 'bandpass', 300, 1.2, 0.0001, null, 5000); sw.gain.cancelScheduledValues(t); sw.gain.setValueAtTime(0.0001, t); sw.gain.exponentialRampToValueAtTime(0.5, t + 0.2); sw.gain.linearRampToValueAtTime(0.0001, t + 0.23);
+    const t1 = t + 0.2;
+    tone(t1, 3.2, 'sine', 210, 20, 1.0).connect(echoIn);
+    nz(t1, 0.09, 'highpass', 900, 0.7, 1.0).connect(echoIn); nz(t1, 2.6, 'lowpass', 300, 0.5, 0.9, null, 45).connect(revIn);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 5; lp.frequency.setValueAtTime(5200, t1); lp.frequency.exponentialRampToValueAtTime(160, t1 + 2.2);
+    lp.connect(sfxBus); lp.connect(echoIn); lp.connect(revIn);
+    [1, 1.007, 0.5, 1.5].forEach(k => tone(t1, 2.3, 'sawtooth', 1500 * k, 70 * k, 0.12, lp, 0.01));   // le faisceau qui hurle en descendant
+    const hz = nz(t1 + 0.1, 2.4, 'highpass', 5200, 0.7, 0.16); hz.connect(echoIn);                   // le grésillement de ce qui se désintègre
+    musicBus.gain.cancelScheduledValues(t); musicBus.gain.setValueAtTime(0.05, t); musicBus.gain.linearRampToValueAtTime(0.85, t + 4);
+    musicLP.frequency.cancelScheduledValues(t); musicLP.frequency.setTargetAtTime(180, t, 0.03); musicLP.frequency.setTargetAtTime(18000, t + 2.4, 0.6);
   }
   function parry() { if (!ok()) return; const t = now(); nz(t, 0.09, 'bandpass', 3200, 2, 0.6).connect(revIn); tone(t, 0.18, 'square', 520, 240, 0.14); tone(t, 0.25, 'sine', 120, 60, 0.4); }
   function miss() { if (!ok()) return; tone(now(), 0.25, 'triangle', 300, 160, 0.08); }
@@ -300,5 +342,5 @@ const Snd = (() => {
   function setMuted(v) { muted = v; if (ctx) master.gain.setTargetAtTime(v ? 0 : 0.9, now(), 0.03); }
   function suspend(v) { if (!ctx) return; if (v) ctx.suspend(); else ctx.resume(); }
 
-  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, get muted() { return muted; } };
+  return { init, setMood, setRush, setMuted, suspend, impact, slowmo, whoosh, chargeStart, chargeSet, chargeStop, step: step_, roar, yelp, growl, fly, twinkle, spot, alert, levelUp, hurt, pickup, perfect, ui, swipe, miss, bell, parry, boom, jump, thud, treeCrack, treeDown, rockBreak, wallBreak, ray, get muted() { return muted; } };
 })();

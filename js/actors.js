@@ -64,7 +64,7 @@ const Actors = (() => {
     else if (s.air && side < 0.3) { m.legA.rotation.x = 0.75; m.legB.rotation.x = -0.6; m.armA.rotation.x = m.armB.rotation.x = -2.2; m.armA.rotation.z = 0.7; m.armB.rotation.z = -0.7; }
     const g = Math.max(ch * ch, k) * (s.mega ? 2.6 : 1.7) * (1 + 0.15 * Math.sin(t * 40));
     m.glow.scale.setScalar(Math.max(0.01, g));
-    m.glow.material.color.setHex(s.mega ? 0x7fe9ff : (ch >= 0.99 || k > 0.5 ? 0xfff0c0 : 0xff9a3a));
+    m.glow.material.color.setHex(s.mega ? 0xff3b2b : (ch >= 0.99 || k > 0.5 ? 0xfff0c0 : 0xff9a3a));
   }
 
   /* ---------- les ours ---------- */

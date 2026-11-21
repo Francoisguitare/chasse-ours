@@ -47,6 +47,7 @@ const Duel = (() => {
     G.scene.add(model.root);
     const o = { id, model, x: d.x, y: d.y, z: d.z, f: d.f, tx: d.x, ty: d.y, tz: d.z, tf: d.f, v: 0, c: 0, ch: 0, k: 0, sp: 0, h: 0, inv: 0, fl: 0, sc: 0, cp: 0, kp: 0, spk: 0, vis: true, seen: performance.now() };
     others.set(id, o); $('invite').hidden = true;
+    if (World.broken.length) Net.send({ t: 'brks', l: World.broken.slice(-500).map(b => [b[0], b[1], r2(b[2]), r2(b[3])]) });   // le nouveau venu rattrape ce qui est déjà cassé
     if (failed) { failed = false; G.dismissCard(); }   // la liaison a fini par s'établir : on retire le message d'échec
     G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points. Par surprise, ça compte double.</small>`, 'red', 4200); Snd.alert();
     return o;
@@ -63,6 +64,8 @@ const Duel = (() => {
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; G.whenCalm(() => endCard(false)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
+    else if (d.t === 'brk' && 'trw'.includes(d.k) && num(d.dx) && num(d.dz)) G.breakThing(d.k, d.i | 0, d.dx, d.dz, true);   // l'autre a cassé quelque chose
+    else if (d.t === 'brks' && Array.isArray(d.l)) for (const b of d.l.slice(0, 600)) { if (Array.isArray(b) && 'trw'.includes(b[0])) World.breakIt(b[0], b[1] | 0, +b[2] || 1, +b[3] || 0); }
   }
 
   /* ---------- chaque image : j'envoie mon état, je replace les autres ---------- */
@@ -106,10 +109,10 @@ const Duel = (() => {
       const tags = []; if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
       G.impactFX(dummy(o.x, o.z), k, U.clamp(0.4 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0), 0.3, 1.6), !!k.mega, launch);
       Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega });
-      if (k.mega) S.fury = 0;
+      if (k.mega) { S.fury = 0; G.fireRay(o.x, o.y + 1.2, o.z, k.dx, k.dz); }
       if (!launch) { G.showHit('Trop mou', 'soft', []).verdict.textContent = 'Arme au moins à moitié pour l\'envoyer'; return true; }
       score += pts; o.fl = 1; if (!k.mega) S.fury = Math.min(100, S.fury + 26);
-      G.showHit(k.mega ? 'Méga chassé' : sneaky ? 'Chassé surprise' : 'Chassé', k.mega ? 'mega' : '', tags.concat(pts > 1 ? '+2 points' : '+1 point')).verdict.textContent = `${score} à ${o.sc}`;
+      G.showHit(k.mega ? 'Désintégré' : sneaky ? 'Chassé surprise' : 'Chassé', k.mega ? 'mega' : '', tags.concat(pts > 1 ? '+2 points' : '+1 point')).verdict.textContent = `${score} à ${o.sc}`;
       if (score >= GOAL) { over = true; Net.send({ t: 'win', id: Net.id() }); G.whenCalm(() => endCard(true)); }
       return true;
     }
@@ -121,6 +124,7 @@ const Duel = (() => {
     G.stopCharge(); P.kick = null;
     G.impactFX(dummy(P.x, P.z), { dx, dz }, d.launch ? 1.1 : 0.5, !!d.mega, false);
     const el = $('hurt'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    if (d.mega) G.fireRay(P.x, (P.y || 0) + 1.2, P.z, dx, dz, true);
     if (d.launch) { P.fly = { t: 0, vx: dx * 19, vz: dz * 19, vy: 15, by: d.id }; P.crouch = false; $('t-crouch').classList.remove('on'); G.showHit('Envoyé', 'soft', []).verdict.textContent = 'Tu réapparais dans un instant'; }
     else { P.vx = dx * 13; P.vz = dz * 13; P.hurtT = 0.4; }
   }

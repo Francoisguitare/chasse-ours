@@ -4,7 +4,7 @@ const FX = (() => {
   const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let scene, camera, renderer, cv, g2, VW = 1, VH = 1, dpr = 1;
-  let add, alpha, light, lightI = 0, trauma = 0, flashA = 0, flashC = '255,255,255', lines = null;
+  let beam = null, add, alpha, light, lightI = 0, trauma = 0, flashA = 0, flashC = '255,255,255', lines = null;
   const rings = [], sprites = [], decals = [], domes = [], stars = [], skyRings = [];
   const F = { onDraw: null, rush: 0 };
 
@@ -123,13 +123,13 @@ const FX = (() => {
   function sparks(x, y, z, dx, dz, n, sp, mega) {
     for (let i = 0; i < n; i++) {
       const spread = 0.9, vx = dx + rnd(-spread, spread), vz = dz + rnd(-spread, spread), v = sp * rnd(0.3, 1);
-      add.spawn(x, y, z, vx * v, rnd(-2, 12), vz * v, rnd(0.3, 0.85), rnd(0.25, 0.5), 0, mega ? 0.5 : 1, mega ? 0.9 : rnd(0.6, 0.85), mega ? 1 : 0.3, 1, 18, 1.2);
+      add.spawn(x, y, z, vx * v, rnd(-2, 12), vz * v, rnd(0.3, 0.85), rnd(0.25, 0.5), 0, 1, mega ? rnd(0.15, 0.4) : rnd(0.6, 0.85), mega ? 0.1 : 0.3, 1, 18, 1.2);
     }
   }
   function sparkle(x, y, z, r = 1.6) { add.spawn(x + rnd(-r, r), y + rnd(-0.6, 1.4), z + rnd(-r, r), rnd(-0.3, 0.3), rnd(0.6, 1.8), rnd(-0.3, 0.3), rnd(0.6, 1.2), rnd(0.18, 0.34), 0, 1, 0.85, 0.4, 0.95, 0, 0.5); }
   function aura(x, y, z, c, mega) {
     const a = rnd(6.283), r = rnd(1.6, 2.8), h = rnd(0, 2.2), life = rnd(0.25, 0.4), sx = x + Math.cos(a) * r, sz = z + Math.sin(a) * r;
-    add.spawn(sx, h, sz, (x - sx) / life, (y - h) / life, (z - sz) / life, life, 0.3, 0.05, mega ? 0.5 : 1, mega ? 0.9 : 0.6 + 0.3 * c, mega ? 1 : 0.2, 0.9, 0, 0);
+    add.spawn(sx, h, sz, (x - sx) / life, (y - h) / life, (z - sz) / life, life, 0.3, 0.05, 1, mega ? 0.2 : 0.6 + 0.3 * c, mega ? 0.1 : 0.2, 0.9, 0, 0);
   }
   function leaves(x, y, z, n, fall) {
     for (let i = 0; i < n; i++) {
@@ -145,15 +145,16 @@ const FX = (() => {
   function trail(x, y, z, mega, heat) {
     if (heat >= 2) alpha.spawn(x + rnd(-0.4, 0.4), y + rnd(-0.4, 0.4), z + rnd(-0.4, 0.4), rnd(-0.5, 0.5), rnd(-0.5, 0.5), rnd(-0.5, 0.5), rnd(0.9, 1.5), 1.4, 4.2, 1, 1, 1, 0.5, 0, 0.6);
     if (heat === 3) { add.spawn(x + rnd(-0.6, 0.6), y + rnd(-0.6, 0.6), z + rnd(-0.6, 0.6), rnd(-2, 2), rnd(-1, 3), rnd(-2, 2), rnd(0.35, 0.7), 2.2, 0.2, 1, rnd(0.45, 0.8), 0.15, 1, 0, 1); alpha.spawn(x, y, z, rnd(-1, 1), rnd(0, 2), rnd(-1, 1), rnd(1, 1.8), 1.5, 4.5, 0.16, 0.14, 0.13, 0.5, -1, 0.8); }
-    if (heat >= 4) add.spawn(x + rnd(-0.5, 0.5), y + rnd(-0.5, 0.5), z + rnd(-0.5, 0.5), rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), rnd(0.4, 0.8), 2.6, 0.2, 0.55, 0.9, 1, 1, 0, 1);
+    if (heat === 5) { for (let i = 0; i < 3; i++) add.spawn(x + rnd(-1, 1), y + rnd(-1, 1), z + rnd(-1, 1), rnd(-6, 6), rnd(-4, 7), rnd(-6, 6), rnd(0.4, 1), rnd(0.3, 0.7), 0, 1, rnd(0.1, 0.4), 0.06, 1, 4, 1.5); return; }   // désintégration
+    if (heat === 4) add.spawn(x + rnd(-0.5, 0.5), y + rnd(-0.5, 0.5), z + rnd(-0.5, 0.5), rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), rnd(0.4, 0.8), 2.6, 0.2, 0.55, 0.9, 1, 1, 0, 1);
     alpha.spawn(x + rnd(-0.5, 0.5), y + rnd(-0.5, 0.5), z + rnd(-0.5, 0.5), rnd(-1, 1), rnd(-1, 1), rnd(-1, 1), rnd(0.5, 0.9), 1.2, 3, 0.95, 0.9, 0.8, 0.4, 0, 1);
-    add.spawn(x + rnd(-0.8, 0.8), y + rnd(-0.8, 0.8), z + rnd(-0.8, 0.8), rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), rnd(0.3, 0.6), 0.4, 0, mega ? 0.5 : 1, 0.85, mega ? 1 : 0.4, 1, 0, 0);
+    add.spawn(x + rnd(-0.8, 0.8), y + rnd(-0.8, 0.8), z + rnd(-0.8, 0.8), rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), rnd(0.3, 0.6), 0.4, 0, 1, mega ? 0.3 : 0.85, mega ? 0.15 : 0.4, 1, 0, 0);
   }
 
   // l'impact complet : tout part en même temps, c'est ça qui donne le poids
   function impact(o) {
-    const { x, y, z, dx, dz, heavy, mega, sx, sy } = o, col = mega ? 0x7fe9ff : 0xffc46a, T = o.tier || 0, tk = 1 + 0.3 * T;   // T : palier du coup de pied
-    light.position.set(x, y + 1.2, z); light.color.setHex(mega ? 0x9fefff : 0xffc27a); lightI = 2.2 + 2.6 * heavy + 0.5 * T;
+    const { x, y, z, dx, dz, heavy, mega, sx, sy } = o, col = mega ? 0xff3b2b : 0xffc46a, T = o.tier || 0, tk = 1 + 0.3 * T;   // T : palier du coup de pied
+    light.position.set(x, y + 1.2, z); light.color.setHex(mega ? 0xff5a3a : 0xffc27a); lightI = 2.2 + 2.6 * heavy + 0.5 * T;
     sprite(F.tex.glow, x, y, z, 3, 8 + 6 * heavy, 0.22, col, 0.85);
     sprite(F.tex.burst, x, y, z, 3, 8 + 7 * heavy, 0.2, 0xffffff, 0.95, rnd(6));
     sprite(F.tex.ring, x, y, z, 1.5, 11 + 12 * heavy, 0.36, col, 0.8);
@@ -161,19 +162,42 @@ const FX = (() => {
     ring(x, z, 0xffffff, (9 + 12 * heavy) * tk, 0.5); ring(x, z, col, (15 + 22 * heavy) * tk, 0.95, 0.25, 0.7);
     if (T >= 1) ring(x, z, 0xffffff, (26 + 30 * heavy) * tk, 1.5, 0.3, 0.45);
     if (T >= 3) { ring(x, z, 0xff7a2a, (11 + 15 * heavy) * tk, 0.8, 0.22, 0.9); for (let i = 0; i < 40; i++) { const a = rnd(6.283), v = rnd(6, 16); add.spawn(x, 0.4, z, Math.cos(a) * v, rnd(1, 7), Math.sin(a) * v, rnd(0.5, 1.1), 0.7, 0, 1, rnd(0.4, 0.75), 0.12, 1, 9, 1.4); } }
-    if (mega) { ring(x, z, 0x7fe9ff, 70, 1.6, 0.3, 0.8); dome(x, z, 0x7fe9ff, 26, 0.9); }
+    if (mega) { ring(x, z, 0xff3b2b, 70, 1.6, 0.3, 0.8); dome(x, z, 0xff3b2b, 26, 0.9); }
     dome(x, z, mega ? 0xffffff : 0xffe2b0, 7 + 9 * heavy, 0.45);
     decal(x - dx * 1.6, z - dz * 1.6, 5 + 5 * heavy + 2.2 * T);
     sparks(x, y, z, dx, dz, Math.round((34 + 46 * heavy) * (1 + 0.3 * T)), 20 + 16 * heavy + 3 * T, mega);
     dust(x, z, Math.round((22 + 22 * heavy) * (1 + 0.3 * T)), (8 + 9 * heavy) * (1 + 0.15 * T));
     for (let i = 0; i < 9; i++) add.spawn(x, y, z, rnd(-6, 6), rnd(2, 9), rnd(-6, 6), rnd(0.6, 1.1), 0.7, 0, 1, 1, 0.8, 1, 6, 1.5);
     shake(0.45 + 0.5 * heavy + 0.07 * T);
-    flash(reduce ? 0.2 : 0.42 + 0.3 * Math.min(1, heavy), mega ? '200,245,255' : '255,244,220');
+    flash(reduce ? 0.2 : 0.42 + 0.3 * Math.min(1, heavy), mega ? '255,150,120' : '255,244,220');
     speedLines(sx, sy, 0.45 + 0.4 * heavy, 0.6 + 0.4 * Math.min(1, heavy));
     if (!reduce && heavy > 0.55) impactFrame(mega ? 110 : 70);
   }
 
   /* ---------- 2D par-dessus ---------- */
+  // éclats de bois, de roche ou de pierre
+  function debris(x, y, z, n, r, g, b, dx, dz, h) {
+    for (let i = 0; i < n; i++) { const k = rnd(0.75, 1.1); alpha.spawn(x + rnd(-1, 1), y + rnd(-0.5, 0.5) * (h || 1.5), z + rnd(-1, 1), dx * rnd(2, 12) + rnd(-5, 5), rnd(2, 11), dz * rnd(2, 12) + rnd(-5, 5), rnd(0.9, 1.9), rnd(0.25, 0.6), rnd(0.15, 0.3), r * k, g * k, b * k, 1, 24, 0.6); }
+  }
+  // le rayon de Furie : un cœur blanc dans une gaine rouge, tiré vers l'horizon
+  function ray(o) {
+    const d = new THREE.Vector3(o.dx, 0.1, o.dz).normalize(), L = 520;
+    if (!beam) {
+      const g = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true), mk = (c, op) => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); m.renderOrder = 7; m.frustumCulled = false; scene.add(m); return m; };
+      beam = { outer: mk(0xd81408, 0.42), mid: mk(0xff3a1c, 0.5), core: mk(0xffe6d8, 0.95), t: 9 };
+    }
+    for (const m of [beam.outer, beam.mid, beam.core]) { m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); m.position.set(o.x + d.x * L / 2, o.y + d.y * L / 2, o.z + d.z * L / 2); m.visible = true; }
+    beam.t = 0; beam.L = L;
+    light.position.set(o.x + d.x * 3, o.y + 1.5, o.z + d.z * 3); light.color.setHex(0xff1c0c); lightI = 5;
+    ring(o.x, o.z, 0xffffff, 22, 0.6); ring(o.x, o.z, 0xff2a1a, 46, 1.3, 0.25, 0.9); ring(o.x, o.z, 0xff2a1a, 110, 2.6, 0.3, 0.7); dome(o.x, o.z, 0xff3a2a, 30, 1.1);
+    sprite(F.tex.glow, o.x, o.y, o.z, 5, 20, 0.4, 0xff2a18, 0.85); sprite(F.tex.burst, o.x, o.y, o.z, 4, 26, 0.35, 0xffffff, 1, rnd(6));
+    for (const k of [7, 18, 34, 56]) sprite(F.tex.ring, o.x + d.x * k, o.y + d.y * k, o.z + d.z * k, 2, 10 + k * 0.35, 0.5 + k * 0.006, 0xff5a3a, 0.9);
+    decal(o.x, o.z, 15);
+    for (let i = 0; i < 150; i++) { const k = rnd(0, 70), a = rnd(6.283), v = rnd(3, 14); add.spawn(o.x + d.x * k, o.y + d.y * k, o.z + d.z * k, Math.cos(a) * v + d.x * 20, rnd(-3, 9), Math.sin(a) * v + d.z * 20, rnd(0.6, 1.6), rnd(0.3, 0.7), 0, 1, rnd(0.15, 0.45), 0.08, 1, 3, 1.2); }
+    const p = new THREE.Vector3(o.x, o.y, o.z).project(camera);
+    shake(1.2); flash(reduce ? 0.2 : 0.42, '255,60,40'); speedLines((p.x * 0.5 + 0.5) * VW, (-p.y * 0.5 + 0.5) * VH, 1.1, 1);
+    if (!reduce) impactFrame(120);
+  }
   // passage du mur du son : cône de vapeur, éclair, traits de vitesse
   function sonic(o) {
     const { x, y, z, tier, sx, sy } = o, col = tier >= 4 ? 0x9fefff : tier === 3 ? 0xffb060 : 0xffffff;
@@ -211,6 +235,11 @@ const FX = (() => {
       const e = 1 - Math.pow(1 - k, 2.5); s.s.scale.setScalar(s.s0 + (s.s1 - s.s0) * e); s.s.material.opacity = s.op * (1 - k * k);
     }
     for (const d of decals) { if (!d.m.visible) continue; d.t += dt; d.m.material.opacity = Math.min(1, d.t * 30) * Math.max(0, 1 - d.t / 9); if (d.t > 9) d.m.visible = false; }
+    if (beam && beam.t < 1.7) {   // le rayon gonfle d'un coup, tient, puis se referme
+      beam.t += Math.max(dt, rdt * 0.55); const k = beam.t / 1.7, w = k < 0.06 ? k / 0.06 : k < 0.5 ? 1 + 0.07 * Math.sin(beam.t * 60) : Math.max(0, 1 - (k - 0.5) / 0.5), w2 = w * w;
+      beam.outer.scale.set(3.4 * w, beam.L, 3.4 * w); beam.mid.scale.set(1.9 * w, beam.L, 1.9 * w); beam.core.scale.set(0.8 * w2 + 0.05, beam.L, 0.8 * w2 + 0.05);
+      if (k >= 1) beam.outer.visible = beam.mid.visible = beam.core.visible = false; else if (k < 0.55) lightI = Math.max(lightI, 4.2);
+    }
     lightI *= Math.exp(-7 * fdt); light.intensity = lightI < 0.02 ? 0 : lightI;
     trauma = Math.max(0, trauma - rdt * 1.5);
   }
@@ -248,6 +277,6 @@ const FX = (() => {
     if (flashA > 0.004) { g2.fillStyle = `rgba(${flashC},${flashA.toFixed(3)})`; g2.fillRect(0, 0, VW, VH); flashA *= Math.exp(-9 * rdt); }
   }
 
-  Object.assign(F, { init, resize, update, draw, impact, ring, dome, sprite, decal, dust, puff, sonic, skyRing, sparks, sparkle, aura, leaves, birds, mote, trail, shake, flash, speedLines, star, shakeOffset, reduce });
+  Object.assign(F, { init, resize, update, draw, impact, ring, dome, sprite, decal, dust, puff, sonic, skyRing, debris, ray, sparks, sparkle, aura, leaves, birds, mote, trail, shake, flash, speedLines, star, shakeOffset, reduce });
   return F;
 })();

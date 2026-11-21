@@ -47,7 +47,7 @@ const U = (() => {
 
 const World = (() => {
   'use strict';
-  const W = { R: 200, sites: [], trees: [], colliders: [], patches: [], berries: [], walls: [], kickables: [], sunDir: new THREE.Vector3(-0.62, 0.5, -0.6).normalize() };
+  const W = { R: 200, sites: [], trees: [], colliders: [], patches: [], berries: [], walls: [], kickables: [], rocks: [], broken: [], events: [], sunDir: new THREE.Vector3(-0.62, 0.5, -0.6).normalize() };
   W.camp = { x: -1.8, z: 10 };
   W.town = { x: 10, z: -95, r: 36, gate: { x: 10, z: -59 }, fountain: { x: 10, z: -95 }, bell: { x: 17, z: -108 }, halle: { x: 30, z: -95 },
     pages: [{ x: -10, z: -78 }, { x: -9, z: -112 }, { x: 26, z: -76 }], honey: [{ x: 28, z: -99 }, { x: 32, z: -95 }, { x: 28, z: -91 }, { x: 33, z: -100 }],
@@ -167,7 +167,7 @@ const World = (() => {
       mesh.position.set(x, 0, z); mesh.scale.setScalar(s); mesh.rotation.y = rng() * U.TAU; mesh.castShadow = true; mesh.receiveShadow = true;
       scene.add(mesh);
       const t = { mesh, x, z, s, kind, r: 0.5 * s, top: (kind === 'pine' ? 6 : 5.2) * s, ry: mesh.rotation.y, ph: rng() * 6, shakeA: 0, shakeT0: 0, sdx: 0, sdz: 0, faded: false };
-      W.trees.push(t); W.colliders.push({ x, z, r: t.r });
+      t.col = { x, z, r: t.r }; W.trees.push(t); W.colliders.push(t.col);
     }
     // lisière : un anneau de sapins qui ferme la plaine
     const border = new THREE.InstancedMesh(geos.pine[0], treeMat, 300), dm = new THREE.Object3D();
@@ -185,9 +185,9 @@ const World = (() => {
       let x, z; do { const a = rng() * U.TAU, r = 16 + Math.sqrt(rng()) * (W.R - 20); x = Math.cos(a) * r; z = Math.sin(a) * r; } while (inTown(x, z, 3) || nearRoad(x, z, 4) || nearSite(x, z, 0));
       const s = 0.8 + rng() * 1.6;
       dm.position.set(x, s * 0.25, z); dm.rotation.set(rng() * 3, rng() * 3, rng() * 3); dm.scale.set(s, s * (0.55 + rng() * 0.4), s * (0.8 + rng() * 0.4)); dm.updateMatrix(); rocks.setMatrixAt(i, dm.matrix);
-      W.colliders.push({ x, z, r: s * 0.95, h: s * 0.75 });   // h : on peut grimper dessus
+      const col = { x, z, r: s * 0.95, h: s * 0.75 }; W.colliders.push(col); W.rocks.push({ x, z, s, col });   // h : on peut grimper dessus
     }
-    rocks.castShadow = true; rocks.receiveShadow = true; scene.add(rocks);
+    rocks.castShadow = true; rocks.receiveShadow = true; scene.add(rocks); W.rocksMesh = rocks;
 
     /* --- hautes herbes (cachettes) --- */
     W.patches.push({ x: 11, z: -9, r: 5.5 }, { x: -14, z: -22, r: 6.5 }, { x: 18, z: -40, r: 5 }, { x: -3, z: -86, r: 4 }, { x: 22, z: -108, r: 3.6 }, { x: 4, z: -104, r: 3.4 }, { x: 19, z: -86, r: 3.2 });
@@ -279,9 +279,10 @@ const World = (() => {
     const t = W.town, P = [], cols = [0xd9d2c2, 0xc9c2b2, 0xe2dac8, 0xbdb8ac];
     // un pan de mur = une boîte orientée : elle arrête les corps et, si elle est assez haute, les regards
     const wall = (x, z, len, thick, h, rot, c) => {
+      const p0 = P.length;
       P.push(U.part(new THREE.BoxGeometry(len, h, thick), c || cols[Math.floor(rng() * 4)], U.mat(x, h / 2, z, 1, 1, 1, 0, rot, 0), 0.09));
       if (rng() < 0.45) P.push(U.part(new THREE.BoxGeometry(len * 0.92, 0.22, thick * 1.2), 0x5f8f3e, U.mat(x, h + 0.08, z, 1, 1, 1, 0, rot, 0), 0.12));
-      W.walls.push({ x, z, hl: len / 2, ht: thick / 2, c: Math.cos(rot), s: Math.sin(rot), h, rad: Math.hypot(len / 2, thick / 2) });
+      W.walls.push({ x, z, hl: len / 2, ht: thick / 2, c: Math.cos(rot), s: Math.sin(rot), h, rad: Math.hypot(len / 2, thick / 2), parts: [p0, P.length], solid: !!c });   // solid : clocher et porte, incassables
     };
     const ruin = (x1, z1, x2, z2, hb, gap = 0.12, thick = 0.9) => {
       const dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz), n = Math.max(1, Math.round(L / 2.8)), rot = Math.atan2(-dz, dx);
@@ -335,7 +336,9 @@ const World = (() => {
       else for (let i = 0; i < 7; i++) { const a = st.rot + i * 0.9; wall(st.x + Math.cos(a) * 6, st.z + Math.sin(a) * 6, 2, 2, 1.8 + i * 0.95, a); }
     }
     // la pierre garde un peu de clarté dans l'ombre, sinon les murs virent au kaki
-    const m = new THREE.Mesh(U.merge(P), new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2e2a24 })); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+    const offs = [0]; for (const g of P) offs.push(offs[offs.length - 1] + g.attributes.position.count);
+    for (const w of W.walls) { w.v0 = offs[w.parts[0]]; w.v1 = offs[w.parts[1]]; }   // où retrouver chaque pan dans la géométrie fusionnée
+    const m = new THREE.Mesh(U.merge(P), new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2e2a24 })); m.castShadow = true; m.receiveShadow = true; scene.add(m); W.townGeo = m.geometry;
     // pavés et vieille route
     const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const pg = new THREE.CircleGeometry(t.r + 1.5, 56); pg.rotateX(-Math.PI / 2);
@@ -418,6 +421,50 @@ const World = (() => {
     }
     return out;
   }
+
+  /* ---------- décor destructible ---------- */
+  const _dm = new THREE.Object3D(), _ax = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _qy = new THREE.Quaternion();
+  // casse un arbre ('t'), un rocher ('r') ou un pan de mur ('w') ; renvoie où et quoi, ou null si rien à casser
+  function breakIt(kind, i, dx, dz) {
+    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    const drop = c => { const k = W.colliders.indexOf(c); if (k >= 0) W.colliders.splice(k, 1); };
+    if (kind === 't') {
+      const tr = W.trees[i]; if (!tr || tr.dead) return null;
+      tr.dead = true; tr.fall = { t: 0, dx, dz, down: false }; drop(tr.col);
+      if (tr.faded) { tr.faded = false; tr.mesh.material = treeMat; } tr.mesh.castShadow = true;
+      W.broken.push([kind, i, dx, dz]); return { x: tr.x, z: tr.z, h: tr.top, sub: tr.kind };
+    }
+    if (kind === 'r') {
+      const r = W.rocks[i]; if (!r || r.dead) return null;
+      r.dead = true; drop(r.col); _dm.position.set(r.x, -9, r.z); _dm.scale.set(0.001, 0.001, 0.001); _dm.updateMatrix(); W.rocksMesh.setMatrixAt(i, _dm.matrix); W.rocksMesh.instanceMatrix.needsUpdate = true;
+      W.broken.push([kind, i, dx, dz]); return { x: r.x, z: r.z, h: r.s };
+    }
+    if (kind === 'w') {
+      const w = W.walls[i]; if (!w || w.h < 0 || w.solid) return null;
+      const p = W.townGeo.attributes.position; for (let v = w.v0; v < w.v1; v++) p.setY(v, -60); p.needsUpdate = true;
+      const h = w.h; w.h = -1; W.broken.push([kind, i, dx, dz]); return { x: w.x, z: w.z, h, len: w.hl * 2 };
+    }
+    return null;
+  }
+  // qu'est-ce que le pied touche ?
+  function hitScenery(x, z, y) {
+    if (y < 3) for (let i = 0; i < W.trees.length; i++) { const t = W.trees[i]; if (t.dead) continue; const dx = x - t.x, dz = z - t.z; if (Math.abs(dx) < 2.2 && Math.abs(dz) < 2.2 && dx * dx + dz * dz < (t.r + 0.95) * (t.r + 0.95)) return { kind: 't', i }; }
+    for (let i = 0; i < W.rocks.length; i++) { const r = W.rocks[i]; if (r.dead || y > r.col.h) continue; const dx = x - r.x, dz = z - r.z, m = r.col.r + 0.75; if (dx * dx + dz * dz < m * m) return { kind: 'r', i }; }
+    for (let i = 0; i < W.walls.length; i++) {
+      const w = W.walls[i]; if (w.h <= y + 0.6) continue; const dx = x - w.x, dz = z - w.z; if (Math.abs(dx) > w.rad + 1 || Math.abs(dz) > w.rad + 1) continue;
+      if (Math.abs(dx * w.c - dz * w.s) < w.hl + 0.85 && Math.abs(dx * w.s + dz * w.c) < w.ht + 0.85) return { kind: 'w', i, big: w.h > 7.5 || w.hl > 2.3, solid: !!w.solid };
+    }
+    return null;
+  }
+  // tout ce qui se trouve dans l'axe d'un rayon parti de (x, z)
+  function alongRay(x, z, dx, dz, len, rad) {
+    const out = [], test = (px, pz, size, kind, i) => { const ox = px - x, oz = pz - z, d = ox * dx + oz * dz; if (d > 0.5 && d < len && Math.abs(ox * dz - oz * dx) < rad + size) out.push({ kind, i, d }); };
+    W.trees.forEach((t, i) => { if (!t.dead) test(t.x, t.z, t.r, 't', i); });
+    W.rocks.forEach((r, i) => { if (!r.dead) test(r.x, r.z, r.col.r, 'r', i); });
+    W.walls.forEach((w, i) => { if (w.h > 0 && !w.solid) test(w.x, w.z, w.rad, 'w', i); });
+    return out;
+  }
+  function treesNear(x, z, r) { const out = []; W.trees.forEach((t, i) => { if (t.dead) return; const dx = t.x - x, dz = t.z - z, d = Math.hypot(dx, dz); if (d < r) out.push({ i, d, dx: dx / (d + 0.01), dz: dz / (d + 0.01) }); }); return out; }
   function darken(v) { darkK = Math.max(darkK, v); }
   function setMood(k) { moodT = k; }
 
@@ -427,12 +474,20 @@ const World = (() => {
     sky.position.copy(cam.position);
     moodK = U.damp(moodK, moodT, 2.2, dt + 0.004); darkK = Math.max(0, darkK - dt * 0.9 - 0.002); duskK = U.damp(duskK, duskT, 0.5, dt + 0.002);
     sunLight.color.copy(SUN_DAY).lerp(SUN_DUSK, duskK); sunLight.intensity = 0.88 - 0.3 * duskK; hemi.intensity = 0.66 - 0.14 * duskK; sky.material.uniforms.uDusk.value = duskK;
-    sky.material.uniforms.uMood.value = moodK; sky.material.uniforms.uDark.value = darkK;
-    fogC.copy(FOG_CALM).lerp(FOG_HOT, moodK).lerp(FOG_DUSK, duskK * 0.8); if (darkK > 0) fogC.multiplyScalar(1 - darkK * 0.6); scene.fog.color.copy(fogC);
+    const dk = Math.min(1, darkK); if (dk > 0) { sunLight.intensity *= 1 - 0.85 * dk; hemi.intensity *= 1 - 0.78 * dk; }   // le rayon de Furie éteint le jour
+    sky.material.uniforms.uMood.value = moodK; sky.material.uniforms.uDark.value = Math.min(1, darkK);
+    fogC.copy(FOG_CALM).lerp(FOG_HOT, moodK).lerp(FOG_DUSK, duskK * 0.8); if (darkK > 0) fogC.multiplyScalar(1 - Math.min(1, darkK) * 0.8); scene.fog.color.copy(fogC);
     grassU.uTime.value = t; grassU.uPlayer.value.set(px, 0, pz);
     shockR += 34 * dt; shockAmp *= Math.exp(-1.5 * dt); grassU.uShock.value.z = shockR; grassU.uShockAmp.value = shockAmp;
     const cxm = cam.position.x, czm = cam.position.z, sxm = fx - cxm, szm = fz - czm, sl2 = sxm * sxm + szm * szm + 1e-6, sl = Math.sqrt(sl2);
     for (const tr of W.trees) {
+      if (tr.dead) {   // l'arbre abattu bascule, reste un moment à terre, puis disparaît
+        const f = tr.fall; if (!f) continue; f.t += dt; const a = Math.min(1.5, 2.8 * f.t * f.t + 0.2 * f.t);
+        if (a >= 1.5 && !f.down) { f.down = true; W.events.push({ type: 'treeDown', x: tr.x + f.dx * tr.top * 0.6, z: tr.z + f.dz * tr.top * 0.6, fall: tr.kind === 'fall' }); }
+        tr.mesh.quaternion.setFromAxisAngle(_ax.set(f.dz, 0, -f.dx), a).multiply(_qy.setFromAxisAngle(_up, tr.ry));
+        if (f.t > 5) { const k = 1 - (f.t - 5) / 0.8; if (k <= 0) { tr.mesh.visible = false; tr.fall = null; } else tr.mesh.scale.setScalar(tr.s * k); }
+        continue;
+      }
       let rx = Math.sin(t * 1.1 + tr.ph) * 0.012, rz = Math.cos(t * 0.9 + tr.ph) * 0.012;
       if (tr.shakeA > 0.002) {
         const k = t - tr.shakeT0;
@@ -450,6 +505,6 @@ const World = (() => {
     flame.scale.set(1 + Math.sin(t * 17) * 0.15, 1 + Math.sin(t * 23) * 0.25, 1 + Math.cos(t * 19) * 0.15);
   }
 
-  W.init = init; W.inGrass = inGrass; W.shock = shock; W.update = update; W.darken = darken; W.setMood = setMood; W.blocked = blocked; W.collideWalls = collideWalls; W.groundAt = groundAt; W.setDusk = setDusk; W.inTown = inTown;
+  W.init = init; W.inGrass = inGrass; W.shock = shock; W.update = update; W.darken = darken; W.setMood = setMood; W.blocked = blocked; W.collideWalls = collideWalls; W.groundAt = groundAt; W.setDusk = setDusk; W.inTown = inTown; W.breakIt = breakIt; W.hitScenery = hitScenery; W.alongRay = alongRay; W.treesNear = treesNear;
   return W;
 })();
