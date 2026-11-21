@@ -174,11 +174,31 @@
 
   /* ---------- plein écran ---------- */
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  // iPhone : Safari ne sait pas mettre une page en plein écran. La seule voie, c'est l'icône sur l'écran d'accueil.
+  const iOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches);
+  function iosFullscreenHelp() {
+    const show = () => card({ eyebrow: 'iPhone', title: 'Plein écran', paras: [
+      'Sur iPhone, Safari ne laisse pas une page passer en plein écran. On installe le jeu comme une appli, ça prend dix secondes :',
+      '1. Ouvre cette page dans Safari (pas depuis une autre appli).',
+      '2. Touche le bouton Partager (le carré avec une flèche vers le haut), en bas de l\'écran.',
+      '3. Choisis « Sur l\'écran d\'accueil », puis « Ajouter ».',
+      '4. Lance Chassé d\'Ours depuis la nouvelle icône : le jeu s\'ouvre en plein écran, sans barre ni zoom. Pour le duel, ouvre le lien d\'invitation dans Safari.'],
+      button: 'Compris' });
+    show();
+  }
+  if (standalone) document.querySelectorAll('[data-fs]').forEach(b => { b.hidden = true; });
+  // Safari iPhone : on bloque aussi le zoom par geste et le double appui
+  document.addEventListener('gesturestart', e => e.preventDefault()); document.addEventListener('gesturechange', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault());
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => { const now = Date.now(), inp = e.target && e.target.closest && e.target.closest('input'); if (!inp && now - lastTouchEnd < 320) e.preventDefault(); lastTouchEnd = now; }, { passive: false });
+  document.addEventListener('touchmove', e => { if (e.scale !== undefined && e.scale !== 1) e.preventDefault(); }, { passive: false });
   function toggleFS() {
     if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
     const req = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
     const no = () => banner('Plein écran refusé ici<small>Ouvre la page dans ton navigateur, hors de l\'appli</small>', '', 4200);
-    if (!req) { no(); return; }
+    if (!req) { if (iOS) iosFullscreenHelp(); else no(); return; }
     try { Promise.resolve(req.call(wrap)).then(() => { try { if (coarse && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => { }); } catch (_) { /* rien */ } }).catch(no); } catch (_) { no(); }
   }
   const fsChange = () => { const on = !!fsEl(); document.querySelectorAll('[data-fs]').forEach(b => { b.textContent = on ? b.dataset.off : b.dataset.on; }); resize(); };
@@ -1006,6 +1026,7 @@
   function enter(mode) {
     Snd.init(); Snd.setMood('calm'); Snd.ui();
     $('title-screen').hidden = true; $('hud').hidden = false; $('touch').hidden = !coarse;
+    if (iOS && !standalone) setTimeout(() => banner('Plein écran sur iPhone<small>Partager, puis « Sur l\'écran d\'accueil »</small>', '', 4500), 1500);
     S.running = true; S.timers.length = 0; last = performance.now();
     if (mode === 'solo') {
       S.hintT = 1.2; if (S.kicked >= 3) S.hintStep = HINTS.length;
