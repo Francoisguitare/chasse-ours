@@ -14,7 +14,16 @@ const Duel = (() => {
   function init(api) {
     G = api;
     Net.on('data', onData);
-    Net.on('leave', id => { drop(id === undefined ? null : id); if (!others.size) G.banner('Adversaire parti<small>Le lien reste valable tant que tu gardes la page ouverte</small>', '', 4000); });
+    Net.on('call', onCall);
+    $('lobby-start').addEventListener('click', pressStart);
+    $('lobby-chat').addEventListener('submit', e => { e.preventDefault(); sendChat(); });
+    document.querySelectorAll('[data-mic]').forEach(b => {
+      b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) { /* rien */ } micDown(); });
+      const up = () => micUp(); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('contextmenu', e => e.preventDefault());
+    });
+    addEventListener('keydown', e => { if (e.code === 'KeyV' && !e.repeat && G.S.duel && !(e.target && e.target.tagName === 'INPUT')) micDown(); });
+    addEventListener('keyup', e => { if (e.code === 'KeyV' && G.S.duel) micUp(); });
+    Net.on('leave', id => { const gid = id === undefined ? null : Net.gameId(id); const a = gid && audios.get(gid); if (a) { a.remove(); audios.delete(gid); } if (gid) outCalls.delete(gid); drop(gid === null ? null : gid); renderLobby(true); if (!others.size) G.banner('Adversaire parti<small>Le lien reste valable tant que tu gardes la page ouverte</small>', '', 4000); });
     $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
     const hhmm = () => new Date(joinUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     shareText = () => `Rejoins mon duel dans Chassé d'Ours avant ${hhmm()} (le lien est valable 5 minutes) : ${$('invite-link').value}`;
@@ -30,20 +39,20 @@ const Duel = (() => {
   function fail(title, msg) { failed = true; G.card({ eyebrow: 'Duel', title, paras: [msg], button: 'Retour à la balade' }, () => { try { location.hash = ''; } catch (_) { /* rien */ } location.reload(); }); }
 
   function start(r, code) {
-    role = r; score = 0; over = false; place(r === 'host' ? 0 : 1); $('duel-score').hidden = false; refresh();
+    role = r; score = 0; over = false; place(r === 'host' ? 0 : 1); $('duel-score').hidden = false; refresh(); openLobby();
     if (r === 'host') {
       G.banner('Création du duel<small>Mise en relation en cours</small>', '', 2500);
       Net.host((err, c) => {
         if (err) { fail('Mise en relation impossible', 'Le service qui relie les deux navigateurs ne répond pas. Vérifie ta connexion, puis réessaie.'); return; }
         const link = location.href.split('#')[0] + '#duel-' + c;
         joinUntil = Date.now() + JOIN_MS;   // on peut rejoindre pendant cinq minutes
-        $('invite-link').value = link; $('invite-share').hidden = !navigator.share; $('invite').hidden = false;
+        $('invite-link').value = link; $('invite-share').hidden = !navigator.share; $('invite').hidden = false; renderLobby(true);
       });
     } else {
       G.banner('Connexion au duel<small>Mise en relation en cours</small>', '', 2500);
       Net.join(code, err => {
         if (err) { fail('Duel introuvable', 'Le lien a expiré, ou la personne qui t\'invite a fermé la page. Demande-lui un nouveau lien.'); return; }
-        G.banner('Connecté<small>Trouve ton adversaire avant qu\'il te trouve</small>', '', 3600);
+        G.banner('Connecté<small>Le salon attend que quelqu\'un lance la partie</small>', '', 3000);
       });
     }
   }
@@ -52,7 +61,7 @@ const Duel = (() => {
     const col = COLORS[others.size % COLORS.length], model = Actors.makePlayer({ remote: true, shirt: col[0], sleeve: col[1] });
     G.scene.add(model.root);
     const o = { id, model, x: d.x, y: d.y, z: d.z, f: d.f, tx: d.x, ty: d.y, tz: d.z, tf: d.f, v: 0, c: 0, ch: 0, k: 0, sp: 0, h: 0, inv: 0, fl: 0, sc: 0, cp: 0, kp: 0, spk: 0, vis: true, seen: performance.now() };
-    others.set(id, o); $('invite').hidden = true;   // le lien reste valable jusqu'à la fin des cinq minutes
+    others.set(id, o); if (!inLobby) $('invite').hidden = true; renderLobby(true);
     if (World.broken.length) Net.send({ t: 'brks', l: World.broken.slice(-500).map(b => [b[0], b[1], r2(b[2]), r2(b[3])]) });   // le nouveau venu rattrape ce qui est déjà cassé
     if (failed) { failed = false; G.dismissCard(); }   // la liaison a fini par s'établir : on retire le message d'échec
     G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3000); Snd.alert();
@@ -67,12 +76,16 @@ const Duel = (() => {
       const o = others.get(d.id) || add(d.id, d), now = performance.now(), gap = Math.max(0.03, (now - o.seen) / 1000);
       o.v = Math.hypot(d.x - o.tx, d.z - o.tz) / gap; o.seen = now; o.tx = d.x; o.ty = d.y; o.tz = d.z; o.tf = d.f;
       o.c = d.c ? 1 : 0; o.ch = num(d.ch) ? U.clamp(d.ch, 0, 1) : 0; o.k = d.k ? 1 : 0; o.sp = d.sp ? 1 : 0; o.h = d.h ? 1 : 0; o.inv = d.inv ? 1 : 0; o.fl = d.fl ? 1 : 0; o.sc = num(d.sc) ? d.sc | 0 : 0; o.hp = num(d.hp) ? U.clamp(d.hp, 0, 100) : 100;
+      if (inLobby) renderLobby();
       if (d.id === 'h' && !Net.isHost && num(d.g) && [5, 11, 21].includes(d.g) && d.g !== GOAL) { GOAL = d.g; scoreKey = ''; }   // l'hôte fixe le nombre de points
       if (typeof d.n === 'string') { const nm = d.n.replace(/[\u0000-\u001f]/g, '').slice(0, 14).trim(); if (nm && nm !== o.name) { const first = !o.name; o.name = nm; scoreKey = ''; if (first) G.banner(`${nm} entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3600); } }
       if (num(d.tp) && d.tp !== o.tp) { if (o.tp !== undefined) { FX.tpOut(o.x, o.y, o.z); o.x = d.x; o.y = d.y; o.z = d.z; o.f = d.f; FX.tpIn(o.x, o.y, o.z); Snd.teleport(); } o.tp = d.tp; }
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; const w = others.get(d.id); G.whenCalm(() => endCard(false, w && w.name)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
+    else if (d.t === 'start') beginCountdown();
+    else if (d.t === 'talk' && typeof d.id === 'string') { const o = others.get(d.id); if (o) { o.talk = !!d.on; renderLobby(); } }
+    else if (d.t === 'chat' && typeof d.m === 'string' && typeof d.n === 'string') { chatLog.push({ n: d.n.slice(0, 14), m: d.m.slice(0, 120) }); if (chatLog.length > 30) chatLog.shift(); renderLobby(true); if (!inLobby) G.banner(`${d.n.slice(0, 14).replace(/[<>&]/g, '')}<small>${d.m.slice(0, 120).replace(/[<>&]/g, '')}</small>`, '', 3500); }
     else if (d.t === 'late' && !others.size) fail('Trop tard', 'On ne peut rejoindre un duel que pendant les cinq minutes qui suivent sa création. Demande un nouveau lien.');
     else if (d.t === 'dodge' && d.to === Net.id()) { G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos'; }
     else if (d.t === 'ko' && d.to === Net.id() && !over) {   // c'est la victime qui annonce le K.-O. : elle seule connaît sa santé
@@ -94,7 +107,7 @@ const Duel = (() => {
     }
     if (joinUntil) {   // compte à rebours des inscriptions
       const left = joinUntil - Date.now();
-      if (left <= 0) { joinUntil = 0; Net.lock(); $('invite').hidden = true; G.banner('Inscriptions closes<small>Plus personne ne peut rejoindre ce duel</small>', '', 3000); }
+      if (left <= 0) { joinUntil = 0; Net.lock(); $('invite').hidden = true; renderLobby(true); G.banner('Inscriptions closes<small>Plus personne ne peut rejoindre ce duel</small>', '', 3000); }
       else { const s = Math.ceil(left / 1000), t = `On peut rejoindre encore ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if (t !== joinKey) { joinKey = t; $('invite-timer').textContent = t; } }
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
@@ -202,7 +215,7 @@ const Duel = (() => {
     const rk = ranking().map((r, i) => `${i + 1}. ${r.name} : ${r.sc}`);
     G.card({ eyebrow: 'Duel terminé · premier à ' + GOAL, title: won ? 'Victoire' : (winner ? winner + ' gagne' : 'Défaite'), paras: [won ? 'Tes adversaires sont partis voir les montagnes de près.' : 'Tu as vu les montagnes de près. Cache-toi mieux, frappe dans le dos.'].concat(rk), button: 'Revanche' }, () => { Net.send({ t: 'again' }); reset(); });
   }
-  function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(role === 'host' ? 0 : 1); G.P.invuln = 2; G.S.fury = 0; G.S.hp = 100; scoreKey = ''; }
+  function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(spawnIndex()); G.P.invuln = 2; G.S.fury = 0; G.S.hp = 100; scoreKey = ''; }
 
   // par-dessus la 3D : étiquette de l'adversaire visible, flèche s'il est hors champ ou s'il fait du bruit
   function draw(g, w, h) {
@@ -211,14 +224,82 @@ const Duel = (() => {
       if (!o.vis) continue;
       const p = G.project(o.x, o.y + 2.9, o.z);
       if (p.on) {
-        g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; const lab = (o.name || 'Adversaire').toUpperCase(); g.strokeText(lab, p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText(lab, p.x, p.y);
+        g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; const lab = (o.name || 'Adversaire').toUpperCase() + (o.talk ? '  ◉ parle' : ''); g.strokeText(lab, p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText(lab, p.x, p.y);
         const hp = o.hp === undefined ? 100 : o.hp, bw = 56; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(p.x - bw / 2 - 1, p.y + 9, bw + 2, 7); g.fillStyle = hp > 30 ? '#7fd85a' : '#ff4f3a'; g.fillRect(p.x - bw / 2, p.y + 10, bw * hp / 100, 5);
       }
     }
   }
 
   // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
-  function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
+  function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl || o.h || !o.vis) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
+
+  /* ---------- salon d'attente ---------- */
+  let inLobby = false, started = false, lobbyKey = '';
+  const chatLog = [];
+  function openLobby() {
+    inLobby = true; started = false; G.S.modal = true; $('lobby').hidden = false;
+    if (role === 'host') { const inv = $('invite'); $('lobby-invite').appendChild(inv); inv.hidden = true; }
+    renderLobby(true);
+  }
+  function renderLobby(force) {
+    if (!inLobby) return;
+    const list = [{ name: myName, me: true, talk: talking }].concat([...others.values()].map(o => ({ name: o.name || '…', talk: o.talk })));
+    const key = list.map(p => p.name + (p.talk ? '*' : '')).join('|') + chatLog.length + (role === 'host' && !$('invite').hidden);
+    if (!force && key === lobbyKey) return; lobbyKey = key;
+    const ul = $('lobby-players'); ul.textContent = '';
+    list.forEach(p => { const li = document.createElement('li'); li.className = (p.me ? 'me' : '') + (p.talk ? ' talk' : ''); const n = document.createElement('span'); n.textContent = p.name + (p.me ? ' (toi)' : ''); const st = document.createElement('em'); st.textContent = p.talk ? 'parle' : 'prêt'; li.append(n, st); ul.appendChild(li); });
+    const n = list.length; $('lobby-status').textContent = n < 2 ? 'En attente d\'au moins un autre joueur…' : `${n} joueurs prêts. N'importe qui peut lancer la partie.`;
+    $('lobby-start').disabled = n < 2;
+    const log = $('lobby-chat-log'); log.textContent = '';
+    chatLog.slice(-6).forEach(m => { const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = m.n + ' : '; p.append(b, document.createTextNode(m.m)); log.appendChild(p); });
+  }
+  function pressStart() { if (!inLobby || others.size < 1) return; Net.send({ t: 'start', id: Net.id() }); beginCountdown(); }
+  function spawnIndex() { const ids = [Net.id()].concat([...others.keys()]).sort((a, b) => a === 'h' ? -1 : b === 'h' ? 1 : a < b ? -1 : 1); return ids.indexOf(Net.id()); }
+  // 3, 2, 1… chez tout le monde, puis tout le monde part en même temps
+  function beginCountdown() {
+    if (started) return; started = true; inLobby = false; $('lobby').hidden = true; $('invite').hidden = true;
+    if (Net.isHost) { Net.lock(); joinUntil = 0; }
+    score = 0; over = false; for (const o of others.values()) o.sc = 0; place(spawnIndex()); G.P.invuln = 0; G.S.fury = 0; G.S.hp = 100; scoreKey = '';
+    const el = $('countdown'); let n = 3;
+    const tick = () => {
+      el.hidden = false; el.textContent = n > 0 ? String(n) : 'Chassé !'; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+      if (n > 0) { Snd.combo(1); n--; setTimeout(tick, 900); }
+      else { Snd.combo(4); G.S.modal = false; setTimeout(() => { el.hidden = true; }, 800); }
+    };
+    tick();
+  }
+  function sendChat() {
+    const inp = $('lobby-chat-input'), m = inp.value.replace(/\s+/g, ' ').trim().slice(0, 120); if (!m) return;
+    inp.value = ''; chatLog.push({ n: myName, m }); Net.send({ t: 'chat', id: Net.id(), n: myName, m }); renderLobby(true);
+  }
+
+  /* ---------- voix : on maintient le micro, tout le monde entend ---------- */
+  let micStream = null, micHeld = false, talking = false, micAsk = null;
+  const outCalls = new Map(), audios = new Map();
+  function setTalk(on) {
+    talking = on; if (micStream) micStream.getAudioTracks().forEach(t => { t.enabled = on; });
+    Net.send({ t: 'talk', id: Net.id(), on: !!on }); document.querySelectorAll('[data-mic]').forEach(b => b.classList.toggle('on', on)); renderLobby();
+  }
+  async function micDown() {
+    micHeld = true;
+    if (!micStream) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { G.banner('Micro indisponible<small>Ce navigateur ne donne pas accès au micro</small>', 'red', 3000); return; }
+      try { micAsk = micAsk || navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); micStream = await micAsk; }
+      catch (e) { micAsk = null; G.banner('Micro refusé<small>Autorise le micro pour ce site dans les réglages du navigateur</small>', 'red', 3500); return; }
+      micStream.getAudioTracks().forEach(t => { t.enabled = false; });
+    }
+    for (const id of others.keys()) if (!outCalls.has(id)) { const c = Net.call(id, micStream); if (c) { outCalls.set(id, c); c.on('close', () => outCalls.delete(id)); c.on('error', () => outCalls.delete(id)); } }
+    if (micHeld) setTalk(true);
+  }
+  function micUp() { micHeld = false; if (talking) setTalk(false); }
+  function onCall(c) {
+    try { c.answer(); } catch (_) { return; }
+    c.on('stream', st => {
+      const id = Net.gameId(c.peer); let a = audios.get(id);
+      if (!a) { a = document.createElement('audio'); a.autoplay = true; a.setAttribute('playsinline', ''); document.body.appendChild(a); audios.set(id, a); }
+      a.srcObject = st; const p = a.play(); if (p && p.catch) p.catch(() => { });
+    });
+  }
   let shareText = () => '';
   function setName(n) { myName = n; scoreKey = ''; }
   function setGoal(g) { if ([5, 11, 21].includes(g)) { GOAL = g; scoreKey = ''; } }

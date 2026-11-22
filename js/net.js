@@ -25,6 +25,7 @@ const Net = (() => {
     isHost = true; myId = 'h'; code = Math.random().toString(36).slice(2, 7).padEnd(5, 'x');
     try { peer = new Peer(pid(code), opts()); } catch (e) { cb(e); return; }
     peer.on('open', () => cb(null, code));
+    peer.on('call', c => emit('call', c));
     peer.on('connection', c => {
       if (locked) { c.on('open', () => { try { c.send({ t: 'late' }); } catch (_) { /* rien */ } setTimeout(() => { try { c.close(); } catch (_) { /* rien */ } }, 400); }); return; }   // délai d'inscription passé
       if (conns.length >= 3) { try { c.close(); } catch (_) { /* rien */ } return; } wire(c); });
@@ -36,10 +37,14 @@ const Net = (() => {
     const cb = once(cb0);
     isHost = false; code = c0;
     try { peer = new Peer(opts()); } catch (e) { cb(e); return; }
+    peer.on('call', c => emit('call', c));
     peer.on('open', id => { myId = id; const c = peer.connect(pid(code), { serialization: 'json' }); wire(c); c.on('open', () => setTimeout(() => cb(null), 500)); });
     peer.on('error', e => { cb(e); emit('error', e); });
     setTimeout(() => cb(new Error('timeout')), 25000);
   }
   function send(d) { for (const c of conns) if (c.open) { try { c.send(d); } catch (_) { /* paquet perdu, le suivant arrive */ } } }
-  return { lock: () => { locked = true; }, available, host, join, send, on: (ev, fn) => { handlers[ev] = fn; }, id: () => myId, get isHost() { return isHost; }, get count() { return conns.length; } };
+  // appel audio direct vers un joueur (l'hôte s'appelle « h » dans le jeu)
+  function call(id, stream) { try { return peer.call(id === 'h' ? pid(code) : id, stream); } catch (_) { return null; } }
+  const gameId = pidOrId => pidOrId === pid(code) ? 'h' : pidOrId;
+  return { call, gameId, lock: () => { locked = true; }, available, host, join, send, on: (ev, fn) => { handlers[ev] = fn; }, id: () => myId, get isHost() { return isHost; }, get count() { return conns.length; } };
 })();

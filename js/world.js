@@ -324,6 +324,26 @@ const World = (() => {
     P.push(U.part(new THREE.ConeGeometry(2.4, 2.7, 4), 0xd9c48a, U.mat(-5.5, 1.35, 11, 1, 1, 1.25, 0, Math.PI / 4, 0)), U.part(new THREE.ConeGeometry(0.9, 2.0, 3), 0x3a2a1c, U.mat(-4.1, 1.0, 9.9, 0.6, 1, 0.2, 0, 0.8, 0)));
     for (let i = 0; i < 3; i++) P.push(U.part(new THREE.CylinderGeometry(0.13, 0.13, 1.3, 5), 0x5a3a22, U.mat(W.camp.x, 0.16, W.camp.z, 1, 1, 1, Math.PI / 2, i * 2.1, 0)));
     W.colliders.push({ x: -5.5, z: 11, r: 2.0 }, { x: W.camp.x, z: W.camp.z, r: 0.7, h: 0.3 });
+
+    // l'arène du duel se remplit : piliers, murets, caisses, arches et escaliers de pierre, de quoi se cacher et grimper partout
+    {
+      const keep = [[10, -66], [21, -119], [-4, -96], [20.5, -82], [t.fountain.x, t.fountain.z], [t.bell.x, t.bell.z], ...t.pages.map(q => [q.x, q.z]), ...t.honey.map(q => [q.x, q.z]), [t.gate.x, t.gate.z]];
+      const segD = (px, pz, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], k = U.clamp(((px - a[0]) * dx + (pz - a[1]) * dz) / (dx * dx + dz * dz || 1), 0, 1); return Math.hypot(px - a[0] - dx * k, pz - a[1] - dz * k); };
+      const onPath = (x, z) => t.patrols.some(pt => pt.some((a, i) => segD(x, z, a, pt[(i + 1) % pt.length]) < 2.6));
+      const freeAt = (x, z, m) => !keep.some(k => Math.hypot(x - k[0], z - k[1]) < m) && !onPath(x, z) && !W.walls.some(w => Math.hypot(w.x - x, w.z - z) < w.rad + 1.6);
+      let placed = 0, tries = 0;
+      while (placed < 70 && tries++ < 3000) {
+        const a = rng() * U.TAU, r = rng() < 0.55 ? Math.sqrt(rng()) * (t.r - 3) : t.r + 3 + rng() * 15, x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r;
+        if (!freeAt(x, z, 4.5)) continue;
+        const kind = placed % 5, rot = rng() * U.TAU, c = Math.cos(rot), sn = Math.sin(rot);
+        if (kind === 0) wall(x, z, 1.3, 1.3, 3 + rng() * 3.5, rot);                                   // pilier
+        else if (kind === 1) wall(x, z, 3 + rng() * 2.5, 0.8, 1.1 + rng() * 0.8, rot);              // muret : accroupi, on s'y cache
+        else if (kind === 2) { wall(x, z, 1.6, 1.6, 1.6, rot); if (rng() < 0.6) wall(x + c * 1.7, z - sn * 1.7, 1.5, 1.5, 1.5, rot + 0.3); if (rng() < 0.5) wall(x + c * 0.8, z - sn * 0.8, 1.4, 1.4, 3.1, rot + 0.6); }   // caisses empilées
+        else if (kind === 3) { wall(x - c * 2.2, z + sn * 2.2, 1.2, 1.2, 4.6, rot); wall(x + c * 2.2, z - sn * 2.2, 1.2, 1.2, 4.6, rot); P.push(U.part(new THREE.BoxGeometry(5.6, 0.9, 1.3), 0xc9c2b2, U.mat(x, 5, z, 1, 1, 1, 0, rot, 0))); }   // arche
+        else for (let i = 0; i < 4; i++) wall(x + c * i * 1.3, z - sn * i * 1.3, 1.3, 2.2, 0.9 + i * 0.9, rot);   // escalier de blocs
+        placed++;
+      }
+    }
     // des ruines partout dans la plaine : maisons, tours, aqueducs, colonnes — autant de choses à grimper
     for (const st of W.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);
@@ -333,6 +353,7 @@ const World = (() => {
         wall(st.x + c * 3.6, st.z - s * 3.6, 2.8, 2.8, h * 0.34, st.rot); wall(st.x + s * 3.6, st.z + c * 3.6, 2.8, 2.8, h * 0.67, st.rot);
         for (const [ox, oz] of [[1.6, 1.6], [-1.6, 1.6], [1.6, -1.6], [-1.6, -1.6]]) P.push(U.part(new THREE.BoxGeometry(0.9, 0.7, 0.9), cols[1], U.mat(st.x + ox * c + oz * s, h + 0.35, st.z - ox * s + oz * c, 1, 1, 1, 0, st.rot, 0)));
       } else if (st.kind === 2) ruin(st.x - c * 13, st.z + s * 13, st.x + c * 13, st.z - s * 13, 6.6, 0.2, 1.7);
+      else if (st.kind === 4) for (let i = 0; i < 9; i++) { const a = st.rot + i * 0.7, r = 2 + i * 0.9; wall(st.x + Math.cos(a) * r, st.z + Math.sin(a) * r, 2.2, 2.2, 0.8 + i * 0.75, a); }
       else for (let i = 0; i < 7; i++) { const a = st.rot + i * 0.9; wall(st.x + Math.cos(a) * 6, st.z + Math.sin(a) * 6, 2, 2, 1.8 + i * 0.95, a); }
     }
     // la pierre garde un peu de clarté dans l'ombre, sinon les murs virent au kaki
@@ -399,10 +420,10 @@ const World = (() => {
   function planRuins() {
     W.sites.push({ x: -16, z: -12, kind: 3, rot: 0.4 }, { x: 24, z: -24, kind: 1, rot: 0.3 }, { x: -24, z: -44, kind: 2, rot: Math.PI / 2 }, { x: 30, z: 14, kind: 0, rot: 0.6 });
     let tries = 0;
-    while (W.sites.length < 34 && tries++ < 4000) {
+    while (W.sites.length < 62 && tries++ < 6000) {
       const a = rng() * U.TAU, r = 34 + Math.sqrt(rng()) * (W.R - 54), x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (inTown(x, z, 22) || nearRoad(x, z, 16) || W.sites.some(s => Math.hypot(s.x - x, s.z - z) < 34)) continue;
-      W.sites.push({ x, z, kind: W.sites.length % 4, rot: rng() * U.TAU });
+      if (inTown(x, z, 22) || nearRoad(x, z, 16) || W.sites.some(s => Math.hypot(s.x - x, s.z - z) < 25)) continue;
+      W.sites.push({ x, z, kind: W.sites.length % 5, rot: rng() * U.TAU });
     }
   }
   function setDusk(k) { duskT = k; }

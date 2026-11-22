@@ -582,7 +582,7 @@
     let th = null;
     if (S.duel) th = Duel.nearest();
     else { let bd = 1e9; for (const b of bears) { if (b.state === 'launched') continue; const d = Math.hypot(b.x - P.x, b.z - P.z); if (d < bd) { bd = d; th = { x: b.x, z: b.z, f: b.face, rad: b.rad, bear: b }; } } }
-    if (!th) { banner('Personne à surprendre<small>Aucun adversaire en vue</small>', '', 1500); Snd.miss(); return; }
+    if (!th) { banner(S.duel ? 'Personne en vue<small>Un joueur caché ne peut pas être ciblé</small>' : 'Personne à surprendre<small>Aucun adversaire en vue</small>', '', 1700); Snd.miss(); return; }
     teleportBehind(th);
     I.kick = true; P.recover = 0;   // on arrive en position de chassé : tant que le bouton reste enfoncé, on arme
   }

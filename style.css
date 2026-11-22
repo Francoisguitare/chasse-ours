@@ -301,6 +301,32 @@ h1 span { color: var(--amber); }
 .name-card { width: min(100%, 420px); }
 #name-input { width: 100%; font: 700 24px var(--f-ui); text-align: center; color: var(--ink); background: var(--cream); border: 0; border-radius: 4px; padding: 10px 12px; letter-spacing: .04em; }
 #name-input:focus { outline: 3px solid var(--amber); outline-offset: 2px; }
+/* salon d'attente et décompte */
+#lobby { background: rgba(10, 22, 16, .9); z-index: 7; }
+.lobby-card { width: min(100%, 520px); display: flex; flex-direction: column; gap: 10px; }
+.lobby-card .eyebrow { margin: 0; color: var(--amber); opacity: 1; font-weight: 700; font-size: 13px; }
+.lobby-card h2 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 7vw, 48px); text-transform: uppercase; line-height: 1; color: var(--cream); text-shadow: 0 .05em 0 var(--ember), 0 .1em 0 var(--ink); }
+.lobby-status { margin: 0; font-size: 16px; font-weight: 500; }
+.lobby-players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lobby-players li { display: flex; justify-content: space-between; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 7px 12px; font-size: 17px; font-weight: 600; }
+.lobby-players li.me span { color: var(--amber); }
+.lobby-players li em { font-style: normal; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--leaf); }
+.lobby-players li.talk { border-color: var(--leaf); box-shadow: 0 0 12px rgba(166, 227, 106, .45); }
+.lobby-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#lobby-start:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+#lobby #invite { position: static; transform: none; width: 100%; z-index: auto; }
+.mic-btn.on, #t-mic.on { background: var(--leaf) !important; color: var(--ink) !important; border-color: var(--leaf) !important; }
+.lobby-chat { display: flex; flex-direction: column; gap: 6px; }
+.lobby-chat-log { display: flex; flex-direction: column; gap: 2px; max-height: 120px; overflow: auto; font-size: 15px; }
+.lobby-chat-log p { margin: 0; }
+.lobby-chat-log b { color: var(--amber); }
+.lobby-chat-row { display: flex; gap: 8px; }
+.lobby-chat-row input { flex: 1; min-width: 0; font: 600 15px var(--f-ui); color: var(--ink); background: var(--cream); border: 0; border-radius: 3px; padding: 8px 10px; }
+#countdown { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 9; font-family: var(--f-display); font-size: clamp(90px, 26vw, 220px); color: var(--cream); text-shadow: 0 .05em 0 var(--ember), 0 .1em 0 var(--ink), 0 0 .4em rgba(255, 140, 40, .8); }
+#countdown.pop { animation: slam .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+#t-mic { display: none; position: absolute; pointer-events: auto; touch-action: none; left: var(--gl); top: 104px; width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--leaf); background: rgba(16, 35, 26, .7); color: var(--cream); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+#game.duel #t-mic { display: block; }
+#game.compact #t-mic { top: 92px; width: 50px; height: 50px; font-size: 10px; }
 /* rayon de Furie : le monde s'éteint et vire au rouge */
 #game.ray #tint { opacity: 1; }
 #game.ray #tint::after { opacity: 1; animation: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 40, 20, .12) 0%, rgba(110, 0, 0, .62) 70%, rgba(20, 0, 0, .9) 100%); transition: opacity .12s; }
