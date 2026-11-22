@@ -488,7 +488,7 @@
   function startKick() {
     // appui bref = coup de combo ; le 4e enchaîné est un final qui projette
     const quick = P.chargeT < 0.22, combo = quick ? (P.comboWin > 0 ? Math.min(4, P.comboN + 1) : 1) : 0; P.comboN = combo; P.comboWin = 0;
-    if (combo === 4) P.chargeT = Math.max(P.chargeT, 0.9 * CFG.chargeTime);
+    if (combo === 4) P.chargeT = Math.max(P.chargeT, 0.6 * CFG.chargeTime);   // le final projette, sans la force d'un chassé armé à fond
     const c = Math.min(1, P.chargeT / CFG.chargeTime), perfect = P.chargeT >= CFG.chargeTime && P.chargeT <= CFG.chargeTime + CFG.perfectWin;
     P.charging = false; P.fullPing = false; Snd.chargeStop();
     // depuis un perchoir, le chassé devient plongeant : plus d'allonge, et on tombe sur la cible
@@ -573,7 +573,7 @@
   }
 
   /* ---------- téléportation : au moment où on se fait taper, on réapparaît dans son dos ---------- */
-  const TP_COST = 25;
+  const TP_COST = 50;
   function tpDown() {
     if (!playing() || (P.fly && P.fly.ko)) return;
     if (P.tpComboT > 0 && !P.fly) { kickDown(); return; }   // juste après une téléportation, le bouton enchaîne le combo
@@ -624,7 +624,7 @@
     if (k.perfect) { mult *= 1.3; tags.push('Armé parfait ×1,3'); }
     if (k.dive) { mult *= 1.5; tags.push('Plongeant ×1,5'); }
     if (k.mega) { mult *= 2.5; tags.push('Furie ×2,5'); S.fury = 0; }
-    if (k.combo === 4) { mult *= 1.4; tags.push('Fin de combo ×1,4'); }
+    if (k.combo === 4) tags.push('Fin de combo');
     const impulse = S.power * (0.3 + 0.7 * k.c) * mult, r = impulse / b.res, launch = r >= 1;
     const heavy = clamp(0.3 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0) + tags.length * 0.04, 0.3, 1.6);
     const { ix, iz } = impactFX(b, k, heavy, k.mega, launch);
@@ -807,8 +807,8 @@
     // saut : une marge après le bord, un appui mémorisé juste avant d'atterrir, et un second saut en l'air
     P.coyote = P.ground || P.climb ? 0.13 : Math.max(0, P.coyote - dt); P.jumpBuf = Math.max(0, P.jumpBuf - dt); let jumped = false;
     if (P.jumpBuf > 0 && !P.kick && P.hurtT <= 0) {
-      if (P.coyote > 0) { P.vy = 11.5 + 2 * P.sprintK; P.jumps = 1; jumped = true; FX.puff(P.x, P.y + 0.2, P.z, 4, 1); Snd.jump(1); }
-      else if (P.jumps < 2) { P.vy = 10.5; P.jumps = 2; jumped = true; FX.ring(P.x, P.z, 0xffffff, 2.6, 0.3, P.y + 0.1, 0.7); Snd.jump(1.5); }
+      if (P.coyote > 0) { P.vy = 16.3 + 2 * P.sprintK; P.jumps = 1; jumped = true; FX.puff(P.x, P.y + 0.2, P.z, 4, 1); Snd.jump(1); }
+      else if (P.jumps < 2) { P.vy = 15; P.jumps = 2; jumped = true; FX.ring(P.x, P.z, 0xffffff, 2.6, 0.3, P.y + 0.1, 0.7); Snd.jump(1.5); }
       if (jumped) { P.jumpBuf = 0; P.coyote = 0; P.ground = false; P.climb = false; P.cut = false; if (P.crouch) { P.crouch = false; $('t-crouch').classList.remove('on'); } }
     }
     if (!I.jumpHeld && !P.cut && P.vy > 3 && !P.ground) { P.vy *= 0.55; P.cut = true; }   // appui bref : petit saut
@@ -874,7 +874,7 @@
     () => coarse ? 'Fonce sur un mur pour le grimper. Bouton <b>Saut</b> : deux sauts d\'affilée. Perché, les ours ne peuvent pas t\'atteindre.' : 'Fonce sur un mur pour le grimper. <kbd>Espace</kbd> pour sauter, deux fois d\'affilée. Perché, les ours ne peuvent pas t\'atteindre.',
     () => coarse ? 'Maintiens <b>Chassé</b> pour armer, relâche pour frapper.' : 'Maintiens le <kbd>clic</kbd> ou <kbd>Entrée</kbd> pour armer ton chassé, relâche pour frapper. Ça marche aussi sur les arbres et les murs.',
     () => coarse ? 'Bouton <b>Accroupi</b> dans les hautes herbes : les ours ne te voient plus.' : 'Accroupis-toi avec <kbd>C</kbd> dans les hautes herbes : les ours ne te voient plus.',
-    () => coarse ? 'Maintiens <b>Téléport</b> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <b>Furie</b> pour la recharger.' : 'Maintiens <kbd>X</kbd> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. Un quart de Furie. Maintiens <kbd>R</kbd> pour la recharger.',
+    () => coarse ? 'Maintiens <b>Téléport</b> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. La moitié de la Furie. Maintiens <b>Furie</b> pour la recharger.' : 'Maintiens <kbd>X</kbd> : tu réapparais dans le dos de ta cible en armant ton chassé, relâche pour frapper. La moitié de la Furie. Maintiens <kbd>R</kbd> pour la recharger.',
     () => coarse ? 'Tape <b>Chassé</b> plusieurs fois de suite : combo de quatre coups, le dernier projette. Pendant le combo, la cible ne peut rien faire.' : 'Tape le <kbd>clic</kbd> plusieurs fois de suite : combo de quatre coups, le dernier projette. Pendant le combo, la cible ne peut rien faire.',
     () => 'Le cône au sol montre ce que l\'ours voit. Arrive par derrière : un ours surpris encaisse le double.',
     () => 'Relâche pile quand la jauge flashe en blanc : armé parfait, +30 % de puissance.',

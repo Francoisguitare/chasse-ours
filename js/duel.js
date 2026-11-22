@@ -130,7 +130,7 @@ const Duel = (() => {
         S.fury = Math.min(100, S.fury + 4); G.showHit('Combo ' + k.combo, 'soft', ['−' + dm]).verdict.textContent = k.combo === 3 ? 'Encore un : le final' : 'Enchaîne !';
         return true;
       }
-      const dmg = k.mega ? 999 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1) * (k.combo === 4 ? 1.3 : 1));
+      const dmg = k.mega ? 999 : k.combo === 4 ? 16 : Math.round((launch ? 22 + 26 * k.c : 9) * (sneaky ? 1.5 : 1) * (k.perfect ? 1.2 : 1));   // le final de combo projette mais ne fait pas plus mal qu'un coup moyen
       const tags = []; if (k.combo === 4) tags.push('Fin de combo'); if (k.ambush) tags.push('Embuscade'); if (back) tags.push('Dans le dos'); if (k.perfect) tags.push('Armé parfait'); if (k.mega) tags.push('Furie');
       G.impactFX(dummy(o.x, o.z), k, U.clamp(0.4 + 0.5 * k.c + (launch ? 0.25 : 0) + (k.mega ? 0.5 : 0), 0.3, 1.6), !!k.mega, launch);
       Net.send({ t: 'hit', id: Net.id(), to: o.id, dx: r2(k.dx), dz: r2(k.dz), c: r2(k.c), launch, mega: !!k.mega, dmg, cb: k.combo || 0 });
@@ -169,6 +169,15 @@ const Duel = (() => {
   function flyStep(dt) {
     const P = G.P, f = P.fly; f.t += dt; P.x += f.vx * dt; P.z += f.vz * dt; P.y = Math.max(0, (P.y || 0) + f.vy * dt); f.vy -= 22 * dt; clamp(P);
     if (dt > 0) FX.trail(P.x, P.y + 1, P.z, false);
+    // projeté dans le décor : on passe à travers en le cassant, ça freine et ça fait un peu mal (jamais mortel)
+    if (f.t > 0.06 && (f.hits || 0) < 3) {
+      const th = World.hitScenery(P.x, P.z, P.y);
+      if (th) {
+        f.hits = (f.hits || 0) + 1; const S = G.S, sp = Math.hypot(f.vx, f.vz) || 1;
+        if (th.solid) { f.vx *= -0.25; f.vz *= -0.25; f.hits = 3; Snd.thud(); } else { G.breakThing(th.kind, th.i, f.vx / sp, f.vz / sp); f.vx *= 0.72; f.vz *= 0.72; }
+        if (!f.ko) S.hp = Math.max(1, S.hp - 6); FX.shake(0.5); const p = G.project(P.x, P.y + 2, P.z); G.floatText(th.kind === 't' ? 'Arbre fauché' : th.kind === 'r' ? 'Rocher éclaté' : 'Mur traversé', p.x, p.y, 'red');
+      }
+    }
     if (!f.ko && f.t > 0.3 && f.vy < 0 && P.y <= World.groundAt(P.x, P.z, P.y)) {   // simple projection : on retombe et on continue
       P.fly = null; P.y = World.groundAt(P.x, P.z, P.y); P.vy = 0; P.hurtT = 0.3; P.vx = f.vx * 0.3; P.vz = f.vz * 0.3; G.pm.pose.rotation.x = 0; FX.dust(P.x, P.z, 12, 6); Snd.thud(); return;
     }
