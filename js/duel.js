@@ -1,8 +1,9 @@
 /* Chassé d'Ours — duel à deux (ou plus) dans les ruines : chacun voit l'autre, sauf s'il se cache. */
 const Duel = (() => {
   'use strict';
-  let G, myName = 'Promeneur', lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
+  let G, joinUntil = 0, joinKey = '', myName = 'Promeneur', lastHit = null, sendAcc = 0, score = 0, over = false, sightHold = 0, scoreKey = '', role = 'host', failed = false;
   let GOAL = 11;
+  const JOIN_MS = 5 * 60 * 1000;
   const others = new Map(), $ = id => document.getElementById(id);
   const ARENA = { x: 10, z: -95, r: 54 };
   const SPAWNS = [[10, -66], [21, -119], [-4, -96], [20.5, -82]];
@@ -15,13 +16,15 @@ const Duel = (() => {
     Net.on('data', onData);
     Net.on('leave', id => { drop(id === undefined ? null : id); if (!others.size) G.banner('Adversaire parti<small>Le lien reste valable tant que tu gardes la page ouverte</small>', '', 4000); });
     $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
+    const hhmm = () => new Date(joinUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    shareText = () => `Rejoins mon duel dans Chassé d'Ours avant ${hhmm()} (le lien est valable 5 minutes) : ${$('invite-link').value}`;
     $('invite-copy').addEventListener('click', () => {
       const inp = $('invite-link'), ok = () => { $('invite-copy').textContent = 'Lien copié'; };
       // secours si le presse-papiers est refusé : ancienne méthode, sinon on laisse le lien sélectionné
       const sel = () => { inp.focus(); inp.select(); inp.setSelectionRange(0, 9999); let done = false; try { done = document.execCommand('copy'); } catch (_) { /* rien */ } if (done) ok(); else $('invite-copy').textContent = 'Lien sélectionné : copie-le'; };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inp.value).then(ok).catch(sel); else sel();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(shareText()).then(ok).catch(sel); else sel();
     });
-    $('invite-share').addEventListener('click', () => { navigator.share({ title: 'Chassé d\'Ours', text: 'Duel de chassés dans les ruines de Val-Perdu', url: $('invite-link').value }).catch(() => { }); });
+    $('invite-share').addEventListener('click', () => { navigator.share({ title: 'Chassé d\'Ours', text: shareText() }).catch(() => { }); });
   }
   function place(i) { const s = SPAWNS[i % SPAWNS.length], P = G.P; P.x = s[0]; P.z = s[1]; P.y = 0; P.vy = 0; P.ground = true; P.climb = false; P.vx = P.vz = 0; P.fly = null; P.hurtT = 0; G.pm.pose.rotation.x = 0; G.cam.init = false; }
   function fail(title, msg) { failed = true; G.card({ eyebrow: 'Duel', title, paras: [msg], button: 'Retour à la balade' }, () => { try { location.hash = ''; } catch (_) { /* rien */ } location.reload(); }); }
@@ -33,6 +36,7 @@ const Duel = (() => {
       Net.host((err, c) => {
         if (err) { fail('Mise en relation impossible', 'Le service qui relie les deux navigateurs ne répond pas. Vérifie ta connexion, puis réessaie.'); return; }
         const link = location.href.split('#')[0] + '#duel-' + c;
+        joinUntil = Date.now() + JOIN_MS;   // on peut rejoindre pendant cinq minutes
         $('invite-link').value = link; $('invite-share').hidden = !navigator.share; $('invite').hidden = false;
       });
     } else {
@@ -48,7 +52,7 @@ const Duel = (() => {
     const col = COLORS[others.size % COLORS.length], model = Actors.makePlayer({ remote: true, shirt: col[0], sleeve: col[1] });
     G.scene.add(model.root);
     const o = { id, model, x: d.x, y: d.y, z: d.z, f: d.f, tx: d.x, ty: d.y, tz: d.z, tf: d.f, v: 0, c: 0, ch: 0, k: 0, sp: 0, h: 0, inv: 0, fl: 0, sc: 0, cp: 0, kp: 0, spk: 0, vis: true, seen: performance.now() };
-    others.set(id, o); $('invite').hidden = true;
+    others.set(id, o); $('invite').hidden = true;   // le lien reste valable jusqu'à la fin des cinq minutes
     if (World.broken.length) Net.send({ t: 'brks', l: World.broken.slice(-500).map(b => [b[0], b[1], r2(b[2]), r2(b[3])]) });   // le nouveau venu rattrape ce qui est déjà cassé
     if (failed) { failed = false; G.dismissCard(); }   // la liaison a fini par s'établir : on retire le message d'échec
     G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3000); Snd.alert();
@@ -69,6 +73,7 @@ const Duel = (() => {
     } else if (d.t === 'hit' && d.to === Net.id()) takeHit(d);
     else if (d.t === 'win' && !over) { over = true; const w = others.get(d.id); G.whenCalm(() => endCard(false, w && w.name)); }
     else if (d.t === 'again') { reset(); G.dismissCard(); }
+    else if (d.t === 'late' && !others.size) fail('Trop tard', 'On ne peut rejoindre un duel que pendant les cinq minutes qui suivent sa création. Demande un nouveau lien.');
     else if (d.t === 'dodge' && d.to === Net.id()) { G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos'; }
     else if (d.t === 'ko' && d.to === Net.id() && !over) {   // c'est la victime qui annonce le K.-O. : elle seule connaît sa santé
       score += d.pts === 2 ? 2 : 1; scoreKey = ''; Snd.levelUp();
@@ -86,6 +91,11 @@ const Duel = (() => {
     if (sendAcc > 0.066) {
       sendAcc = 0;
       Net.send({ t: 's', id: Net.id(), x: r2(P.x), y: r2(P.y || 0), z: r2(P.z), f: r2(P.face), c: P.crouch ? 1 : 0, ch: r2(P.chargePose), k: P.kick ? 1 : 0, sp: P.sprinting ? 1 : 0, h: P.hidden ? 1 : 0, inv: P.invuln > 0 ? 1 : 0, fl: P.fly ? 1 : 0, sc: score, tp: P.tpN || 0, hp: Math.round(G.S.hp), n: myName, g: Net.isHost ? GOAL : undefined });
+    }
+    if (joinUntil) {   // compte à rebours des inscriptions
+      const left = joinUntil - Date.now();
+      if (left <= 0) { joinUntil = 0; Net.lock(); $('invite').hidden = true; G.banner('Inscriptions closes<small>Plus personne ne peut rejoindre ce duel</small>', '', 3000); }
+      else { const s = Math.ceil(left / 1000), t = `On peut rejoindre encore ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if (t !== joinKey) { joinKey = t; $('invite-timer').textContent = t; } }
     }
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
@@ -209,6 +219,7 @@ const Duel = (() => {
 
   // l'adversaire arme ou frappe tout près : il y a de quoi se téléporter
   function nearest() { const P = G.P; let b = null, bd = 1e9; for (const o of others.values()) { if (o.fl) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; b = o; } } return b ? { x: b.x, z: b.z, f: b.f, rad: 0.6 } : null; }
+  let shareText = () => '';
   function setName(n) { myName = n; scoreKey = ''; }
   function setGoal(g) { if ([5, 11, 21].includes(g)) { GOAL = g; scoreKey = ''; } }
   function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
