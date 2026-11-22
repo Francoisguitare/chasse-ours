@@ -16,12 +16,19 @@ const Duel = (() => {
     Net.on('data', onData);
     Net.on('call', onCall);
     $('lobby-start').addEventListener('click', pressStart);
+    $('mic-enable').addEventListener('click', () => enableMic());
+    $('mic-reload').addEventListener('click', () => location.reload());
+    $('mic-open').addEventListener('change', e => setOpenMic(e.target.checked));
+    $('t-shout').addEventListener('pointerdown', e => { e.preventDefault(); $('shouts').hidden = !$('shouts').hidden; });
+    const sh = $('shouts'); SHOUTS.forEach((m, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = m; b.addEventListener('pointerdown', e => { e.preventDefault(); shout(i); }); sh.appendChild(b); });
+    const ls = $('lobby-shouts'); SHOUTS.forEach((m, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => shout(i)); ls.appendChild(b); });
+    addEventListener('keydown', e => { if (G.S.duel && !e.repeat && /^Digit[1-6]$/.test(e.code) && !(e.target && e.target.tagName === 'INPUT' && e.target.type === 'text') && $('levelup').hidden) shout(+e.code.slice(-1) - 1); });
     $('lobby-chat').addEventListener('submit', e => { e.preventDefault(); sendChat(); });
     document.querySelectorAll('[data-mic]').forEach(b => {
       b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) { /* rien */ } micDown(); });
       const up = () => micUp(); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('contextmenu', e => e.preventDefault());
     });
-    addEventListener('keydown', e => { if (e.code === 'KeyV' && !e.repeat && G.S.duel && !(e.target && e.target.tagName === 'INPUT')) micDown(); });
+    addEventListener('keydown', e => { if (e.code === 'KeyV' && !e.repeat && G.S.duel && !(e.target && e.target.tagName === 'INPUT' && e.target.type === 'text')) micDown(); });
     addEventListener('keyup', e => { if (e.code === 'KeyV' && G.S.duel) micUp(); });
     Net.on('leave', id => { const gid = id === undefined ? null : Net.gameId(id); const a = gid && audios.get(gid); if (a) { a.remove(); audios.delete(gid); } if (gid) outCalls.delete(gid); drop(gid === null ? null : gid); renderLobby(true); if (!others.size) G.banner('Adversaire parti<small>Le lien reste valable tant que tu gardes la page ouverte</small>', '', 4000); });
     $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
@@ -61,7 +68,7 @@ const Duel = (() => {
     const col = COLORS[others.size % COLORS.length], model = Actors.makePlayer({ remote: true, shirt: col[0], sleeve: col[1] });
     G.scene.add(model.root);
     const o = { id, model, x: d.x, y: d.y, z: d.z, f: d.f, tx: d.x, ty: d.y, tz: d.z, tf: d.f, v: 0, c: 0, ch: 0, k: 0, sp: 0, h: 0, inv: 0, fl: 0, sc: 0, cp: 0, kp: 0, spk: 0, vis: true, seen: performance.now() };
-    others.set(id, o); if (!inLobby) $('invite').hidden = true; renderLobby(true);
+    others.set(id, o); if (!inLobby) $('invite').hidden = true; renderLobby(true); setTimeout(callAll, 600);
     if (World.broken.length) Net.send({ t: 'brks', l: World.broken.slice(-500).map(b => [b[0], b[1], r2(b[2]), r2(b[3])]) });   // le nouveau venu rattrape ce qui est déjà cassé
     if (failed) { failed = false; G.dismissCard(); }   // la liaison a fini par s'établir : on retire le message d'échec
     G.banner(`Un adversaire entre dans les ruines<small>Premier à ${GOAL} points</small>`, 'red', 3000); Snd.alert();
@@ -85,6 +92,7 @@ const Duel = (() => {
     else if (d.t === 'again') { reset(); G.dismissCard(); }
     else if (d.t === 'start') beginCountdown();
     else if (d.t === 'talk' && typeof d.id === 'string') { const o = others.get(d.id); if (o) { o.talk = !!d.on; renderLobby(); } }
+    else if (d.t === 'chat' && typeof d.m === 'string' && typeof d.n === 'string' && d.s && !inLobby) { const o = others.get(d.id); if (o) o.bubble = { m: d.m.slice(0, 40), t: performance.now() }; chatLog.push({ n: d.n.slice(0, 14), m: d.m.slice(0, 120) }); Snd.ui(); }
     else if (d.t === 'chat' && typeof d.m === 'string' && typeof d.n === 'string') { chatLog.push({ n: d.n.slice(0, 14), m: d.m.slice(0, 120) }); if (chatLog.length > 30) chatLog.shift(); renderLobby(true); if (!inLobby) G.banner(`${d.n.slice(0, 14).replace(/[<>&]/g, '')}<small>${d.m.slice(0, 120).replace(/[<>&]/g, '')}</small>`, '', 3500); }
     else if (d.t === 'late' && !others.size) fail('Trop tard', 'On ne peut rejoindre un duel que pendant les cinq minutes qui suivent sa création. Demande un nouveau lien.');
     else if (d.t === 'dodge' && d.to === Net.id()) { G.showHit('Esquivé', 'soft', []).verdict.textContent = 'Il s\'est téléporté dans ton dos'; }
@@ -110,6 +118,7 @@ const Duel = (() => {
       if (left <= 0) { joinUntil = 0; Net.lock(); $('invite').hidden = true; renderLobby(true); G.banner('Inscriptions closes<small>Plus personne ne peut rejoindre ce duel</small>', '', 3000); }
       else { const s = Math.ceil(left / 1000), t = `On peut rejoindre encore ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if (t !== joinKey) { joinKey = t; $('invite-timer').textContent = t; } }
     }
+    tickMeter(rdt);
     const now = performance.now(), k = 1 - Math.exp(-14 * rdt); let seen = false;
     for (const o of [...others.values()]) {
       if (now - o.seen > 6000) { drop(o.id); continue; }
@@ -218,13 +227,21 @@ const Duel = (() => {
   function reset() { score = 0; over = false; for (const o of others.values()) o.sc = 0; place(spawnIndex()); G.P.invuln = 2; G.S.fury = 0; G.S.hp = 100; scoreKey = ''; }
 
   // par-dessus la 3D : étiquette de l'adversaire visible, flèche s'il est hors champ ou s'il fait du bruit
+  function bubble(g, x, y, b) {
+    const age = (performance.now() - b.t) / 1000; if (age > 3.2) return false;
+    g.save(); g.globalAlpha = Math.min(1, (3.2 - age) * 2); g.font = '700 15px "Barlow Condensed", "Arial Narrow", sans-serif'; const tw = g.measureText(b.m).width + 18, by = y - 30 - Math.min(1, age * 6) * 6;
+    g.fillStyle = '#fff3d4'; g.strokeStyle = '#1b140c'; g.lineWidth = 2; g.beginPath(); g.roundRect ? g.roundRect(x - tw / 2, by - 13, tw, 26, 8) : g.rect(x - tw / 2, by - 13, tw, 26); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(x - 6, by + 12); g.lineTo(x, by + 20); g.lineTo(x + 6, by + 12); g.fill(); g.fillStyle = '#1b140c'; g.fillText(b.m, x, by + 1); g.restore(); return true;
+  }
   function draw(g, w, h) {
     const P = G.P;
+    if (myBubble) { const p = G.project(P.x, (P.y || 0) + 3, P.z); if (!p.on || !bubble(g, p.x, p.y, myBubble)) { if ((performance.now() - myBubble.t) > 3200) myBubble = null; } }
     for (const o of others.values()) {
       if (!o.vis) continue;
       const p = G.project(o.x, o.y + 2.9, o.z);
       if (p.on) {
         g.font = '700 14px "Barlow Condensed", "Arial Narrow", sans-serif'; g.lineWidth = 3; g.strokeStyle = '#1b140c'; const lab = (o.name || 'Adversaire').toUpperCase() + (o.talk ? '  ◉ parle' : ''); g.strokeText(lab, p.x, p.y); g.fillStyle = '#ff8a6a'; g.fillText(lab, p.x, p.y);
+        if (o.bubble && !bubble(g, p.x, p.y, o.bubble)) o.bubble = null;
         const hp = o.hp === undefined ? 100 : o.hp, bw = 56; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(p.x - bw / 2 - 1, p.y + 9, bw + 2, 7); g.fillStyle = hp > 30 ? '#7fd85a' : '#ff4f3a'; g.fillRect(p.x - bw / 2, p.y + 10, bw * hp / 100, 5);
       }
     }
@@ -238,6 +255,7 @@ const Duel = (() => {
   const chatLog = [];
   function openLobby() {
     inLobby = true; started = false; G.S.modal = true; $('lobby').hidden = false;
+    if (!micStream) { micState('off', 'Micro pas encore activé'); if (inApp) micHelp('inapp'); }
     if (role === 'host') { const inv = $('invite'); $('lobby-invite').appendChild(inv); inv.hidden = true; }
     renderLobby(true);
   }
@@ -258,6 +276,7 @@ const Duel = (() => {
   // 3, 2, 1… chez tout le monde, puis tout le monde part en même temps
   function beginCountdown() {
     if (started) return; started = true; inLobby = false; $('lobby').hidden = true; $('invite').hidden = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (Net.isHost) { Net.lock(); joinUntil = 0; }
     score = 0; over = false; for (const o of others.values()) o.sc = 0; place(spawnIndex()); G.P.invuln = 0; G.S.fury = 0; G.S.hp = 100; scoreKey = '';
     const el = $('countdown'); let n = 3;
@@ -280,18 +299,75 @@ const Duel = (() => {
     talking = on; if (micStream) micStream.getAudioTracks().forEach(t => { t.enabled = on; });
     Net.send({ t: 'talk', id: Net.id(), on: !!on }); document.querySelectorAll('[data-mic]').forEach(b => b.classList.toggle('on', on)); renderLobby();
   }
+  /* ---------- réglage du micro : demandé dès l'arrivée, état visible, aide selon le téléphone ---------- */
+  const UA = navigator.userAgent, isAndroid = /Android/i.test(UA), isIOS = /iP(hone|od|ad)/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const inApp = /; wv\)|FBAN|FBAV|Instagram|Line\/|WhatsApp|Snapchat|MicroMessenger|GSA\//i.test(UA);
+  let openMic = false, meter = null;
+  function micState(st, txt) { const el = $('mic-status'); el.textContent = txt; el.dataset.state = st; $('mic-enable').hidden = st === 'on'; $('mic-open-row').hidden = st !== 'on'; }
+  function micHelp(kind) {
+    const H = {
+      inapp: ['Le lien est ouvert dans le navigateur d\'une appli (WhatsApp, Messenger…), qui ne donne pas accès au micro.', isIOS ? 'Touche les trois points ou l\'icône boussole, puis « Ouvrir dans Safari ».' : 'Touche le menu ⋮ en haut à droite, puis « Ouvrir dans Chrome ». Tu reviendras directement dans le salon.'],
+      denied: isIOS
+        ? ['Le micro est bloqué pour ce site.', 'Dans Safari, touche « aA » à gauche de l\'adresse, puis « Réglages du site web » → Micro → Autoriser. Ou : Réglages de l\'iPhone → Safari → Micro → Autoriser. Puis touche Recharger.']
+        : ['Le micro est bloqué pour ce site : le téléphone ne reposera plus la question tout seul.', 'Touche le cadenas (ou l\'icône de réglages) à gauche de l\'adresse → Autorisations → Micro → Autoriser. Puis touche Recharger : tu reviendras dans le salon.'],
+      nomic: ['Aucun micro n\'a été trouvé sur cet appareil.', 'Branche un casque avec micro, puis réessaie.'],
+      busy: ['Le micro est déjà utilisé par une autre appli (appel, dictée, enregistreur…).', 'Ferme-la, puis touche « Activer le micro ».'],
+      insecure: ['Ce navigateur ne donne pas accès au micro.', isAndroid ? 'Ouvre le lien dans Chrome.' : 'Ouvre le lien dans Safari ou Chrome.'],
+    }[kind];
+    const box = $('mic-help'); box.hidden = !H; if (!H) return;
+    $('mic-help-what').textContent = H[0]; $('mic-help-how').textContent = H[1]; $('mic-reload').hidden = kind !== 'denied';
+  }
+  async function enableMic() {
+    if (micStream) return true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) { micState('off', 'Micro indisponible'); micHelp(inApp ? 'inapp' : 'insecure'); return false; }
+    try { if (navigator.permissions && navigator.permissions.query) { const p = await navigator.permissions.query({ name: 'microphone' }); if (p.state === 'denied') { micState('off', 'Micro bloqué'); micHelp(inApp ? 'inapp' : 'denied'); return false; } } } catch (_) { /* ce navigateur ne sait pas répondre : on demande quand même */ }
+    micState('wait', 'Autorise le micro dans la fenêtre du téléphone…');
+    try { micAsk = micAsk || navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); micStream = await micAsk; }
+    catch (e) {
+      micAsk = null; const n = e && e.name;
+      if (n === 'NotFoundError' || n === 'OverconstrainedError') { micState('off', 'Pas de micro'); micHelp('nomic'); }
+      else if (n === 'NotReadableError' || n === 'AbortError') { micState('off', 'Micro occupé'); micHelp('busy'); }
+      else { micState('off', 'Micro refusé'); micHelp(inApp ? 'inapp' : 'denied'); }
+      return false;
+    }
+    micStream.getAudioTracks().forEach(t => { t.enabled = openMic; });
+    micState('on', 'Micro prêt'); micHelp(null); startMeter(); callAll();
+    return true;
+  }
+  function callAll() { if (!micStream) return; for (const id of others.keys()) if (!outCalls.has(id)) { const c = Net.call(id, micStream); if (c) { outCalls.set(id, c); c.on('close', () => outCalls.delete(id)); c.on('error', () => outCalls.delete(id)); } } }
+  // petit vumètre : on voit tout de suite que le micro capte
+  function startMeter() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), an = ac.createAnalyser(); an.fftSize = 256;
+      ac.createMediaStreamSource(micStream).connect(an); const buf = new Uint8Array(an.fftSize);
+      meter = () => { an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128)); return m / 128; };
+      if (ac.state === 'suspended') ac.resume();
+      addEventListener('pointerdown', () => { if (ac.state === 'suspended') ac.resume(); });
+    } catch (_) { meter = null; }
+  }
+  let meterK = 0;
+  function tickMeter(rdt) {
+    if (!meter) return; const lv = meter(); meterK = Math.max(lv, meterK - rdt * 1.5);
+    const live = talking || openMic, w = Math.round(Math.min(1, meterK * 2.2) * 100) + '%';
+    $('mic-level-fill').style.width = w; $('mic-level').classList.toggle('live', live);
+    document.querySelectorAll('[data-mic]').forEach(b => b.style.setProperty('--lv', live ? Math.min(1, meterK * 2.2) : 0));
+  }
+  function setOpenMic(on) { openMic = on; if (micStream) { if (on) setTalk(true); else if (!micHeld) setTalk(false); } }
+
+  /* ---------- cris : quatre phrases toutes prêtes, en bulle au-dessus de la tête ---------- */
+  const SHOUTS = ['Viens là !', 'Trop facile', 'Aïe aïe aïe', 'Revanche ?', 'Bien joué', 'Je suis caché…'];
+  let myBubble = null;
+  function shout(i) {
+    const m = SHOUTS[i]; if (!m) return; Snd.ui(); myBubble = { m, t: performance.now() };
+    chatLog.push({ n: myName, m }); Net.send({ t: 'chat', id: Net.id(), n: myName, m, s: 1 }); renderLobby(true); $('shouts').hidden = true;
+  }
   async function micDown() {
     micHeld = true;
-    if (!micStream) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { G.banner('Micro indisponible<small>Ce navigateur ne donne pas accès au micro</small>', 'red', 3000); return; }
-      try { micAsk = micAsk || navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); micStream = await micAsk; }
-      catch (e) { micAsk = null; G.banner('Micro refusé<small>Autorise le micro pour ce site dans les réglages du navigateur</small>', 'red', 3500); return; }
-      micStream.getAudioTracks().forEach(t => { t.enabled = false; });
-    }
-    for (const id of others.keys()) if (!outCalls.has(id)) { const c = Net.call(id, micStream); if (c) { outCalls.set(id, c); c.on('close', () => outCalls.delete(id)); c.on('error', () => outCalls.delete(id)); } }
+    if (!micStream && !(await enableMic())) { if (!inLobby) G.banner($('mic-status').textContent + '<small>' + ($('mic-help-how').textContent || 'Autorise le micro pour ce site').replace(/[<>&]/g, '') + '</small>', 'red', 6000); return; }
+    callAll();
     if (micHeld) setTalk(true);
   }
-  function micUp() { micHeld = false; if (talking) setTalk(false); }
+  function micUp() { micHeld = false; if (talking && !openMic) setTalk(false); }
   function onCall(c) {
     try { c.answer(); } catch (_) { return; }
     c.on('stream', st => {
@@ -304,5 +380,5 @@ const Duel = (() => {
   function setName(n) { myName = n; scoreKey = ''; }
   function setGoal(g) { if ([5, 11, 21].includes(g)) { GOAL = g; scoreKey = ''; } }
   function threat() { const P = G.P; for (const o of others.values()) { if (o.fl) continue; if ((o.ch > 0.25 || o.k) && Math.hypot(o.x - P.x, o.z - P.z) < 7) return { x: o.x, z: o.z, f: o.f, rad: 0.6 }; } return null; }
-  return { init, start, update, hud, kickTest, threat, nearest, setName, setGoal, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
+  return { init, start, update, hud, kickTest, threat, nearest, setName, setGoal, enableMic, flyStep, clamp, draw, get others() { return others; }, get score() { return score; } };
 })();

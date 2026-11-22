@@ -106,7 +106,7 @@
   function toggleCrouch() { if (!playing() || P.kick || P.hurtT > 0) return; P.crouch = !P.crouch; $('t-crouch').classList.toggle('on', P.crouch); }
   function look(dx, dy) { if (!playing()) return; cam.yaw -= dx * 0.0062; cam.pitch = clamp(cam.pitch + dy * 0.0045, 0.1, 1.25); }
   addEventListener('keydown', e => {
-    if (e.target && e.target.tagName === 'INPUT') return;   // on tape son nom : le jeu n'écoute pas
+    if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'text') return;   // on tape son nom : le jeu n'écoute pas
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     if (!$('card').hidden) { if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) $('card-btn').click(); return; }
     if (S.modal && !$('levelup').hidden && /^(Digit|Numpad)[1-3]$/.test(e.code)) { const b = $('lu-perks').children[+e.code.slice(-1) - 1]; if (b) b.click(); return; }
@@ -1078,6 +1078,7 @@
       e.preventDefault(); playerName = inp.value.replace(/\s+/g, ' ').trim().slice(0, 14) || 'Promeneur';
       try { localStorage.setItem('chasse-ours-nom', playerName); } catch (_) { /* rien */ }
       inp.blur(); $('name-screen').hidden = true; Duel.setName(playerName);
+      if (Net.available()) Duel.enableMic();   // la fenêtre d'autorisation s'ouvre tout de suite, pendant le geste
       if (mode === 'host') { const g = document.querySelector('input[name="goal"]:checked'); Duel.setGoal(g ? +g.value : 11); }
       enter(mode);
     };

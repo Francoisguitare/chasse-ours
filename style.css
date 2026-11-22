@@ -327,6 +327,30 @@ h1 span { color: var(--amber); }
 #t-mic { display: none; position: absolute; pointer-events: auto; touch-action: none; left: var(--gl); top: 104px; width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--leaf); background: rgba(16, 35, 26, .7); color: var(--cream); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 #game.duel #t-mic { display: block; }
 #game.compact #t-mic { top: 92px; width: 50px; height: 50px; font-size: 10px; }
+/* micro, cris */
+.mic-box { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; }
+.mic-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mic-status { font-weight: 700; font-size: 15px; }
+.mic-status[data-state="on"] { color: var(--leaf); }
+.mic-status[data-state="off"] { color: #ff8a6a; }
+.mic-status[data-state="wait"] { color: var(--amber); }
+.mic-level { flex: 1; min-width: 70px; height: 8px; background: rgba(0, 0, 0, .5); border-radius: 4px; overflow: hidden; }
+.mic-level i { display: block; height: 100%; width: 0; background: rgba(255, 243, 212, .45); transition: width .06s; }
+.mic-level.live i { background: var(--leaf); }
+.mic-open { display: flex; gap: 8px; align-items: center; font-size: 15px; font-weight: 500; }
+.mic-open input { width: 20px; height: 20px; accent-color: var(--leaf); }
+.mic-help { border-left: 3px solid #ff8a6a; padding-left: 10px; display: flex; flex-direction: column; gap: 4px; }
+.mic-help p { margin: 0; font-size: 15px; }
+.mic-help p:first-child { font-weight: 700; }
+.mic-help button { align-self: flex-start; }
+.lobby-shouts { display: flex; flex-wrap: wrap; gap: 6px; }
+.lobby-shouts button { padding: 6px 10px; font-size: 13px; }
+[data-mic] { box-shadow: 0 0 0 calc(var(--lv, 0) * 8px) rgba(166, 227, 106, .55); }
+#t-shout { display: none; position: absolute; pointer-events: auto; touch-action: none; left: var(--gl); top: 170px; width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--amber); background: rgba(16, 35, 26, .7); color: var(--cream); font-weight: 700; font-size: 11px; text-transform: uppercase; }
+#game.duel #t-shout { display: block; }
+#game.compact #t-shout { top: 150px; width: 50px; height: 50px; font-size: 10px; }
+.shouts { position: absolute; left: calc(var(--gl) + 66px); top: 104px; display: flex; flex-direction: column; gap: 5px; pointer-events: auto; z-index: 6; }
+.shouts button { background: var(--cream); color: var(--ink); border: 0; border-radius: 14px; padding: 7px 12px; font-weight: 700; font-size: 14px; text-align: left; box-shadow: 0 2px 0 var(--ink); }
 /* rayon de Furie : le monde s'éteint et vire au rouge */
 #game.ray #tint { opacity: 1; }
 #game.ray #tint::after { opacity: 1; animation: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 40, 20, .12) 0%, rgba(110, 0, 0, .62) 70%, rgba(20, 0, 0, .9) 100%); transition: opacity .12s; }

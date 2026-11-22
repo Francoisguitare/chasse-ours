@@ -92,6 +92,8 @@
     <button id="t-tp" type="button">Téléport</button>
     <button id="t-focus" type="button">Furie</button>
     <button id="t-mic" type="button" data-mic aria-label="Maintenir pour parler">Micro</button>
+    <button id="t-shout" type="button" aria-label="Crier une phrase">Crier</button>
+    <div id="shouts" class="shouts" hidden></div>
     <button id="t-kick" type="button">Chassé</button>
   </div>
 
@@ -170,6 +172,16 @@
         <button type="button" class="ghost mic-btn" data-mic>Maintenir pour parler</button>
       </div>
       <div id="lobby-invite"></div>
+      <div class="mic-box">
+        <div class="mic-row">
+          <span id="mic-status" class="mic-status" data-state="off">Micro pas encore activé</span>
+          <div id="mic-level" class="mic-level" aria-hidden="true"><i id="mic-level-fill"></i></div>
+          <button id="mic-enable" type="button" class="cta small">Activer le micro</button>
+        </div>
+        <label id="mic-open-row" class="mic-open" hidden><input id="mic-open" type="checkbox"> Micro ouvert (pas besoin d'appuyer pour parler)</label>
+        <div id="mic-help" class="mic-help" hidden><p id="mic-help-what"></p><p id="mic-help-how"></p><button id="mic-reload" type="button" class="ghost" hidden>Recharger</button></div>
+      </div>
+      <div id="lobby-shouts" class="lobby-shouts"></div>
       <form id="lobby-chat" class="lobby-chat" autocomplete="off">
         <div id="lobby-chat-log" class="lobby-chat-log"></div>
         <div class="lobby-chat-row"><input id="lobby-chat-input" type="text" maxlength="120" placeholder="Écrire aux autres joueurs" aria-label="Message"><button type="submit" class="ghost">Envoyer</button></div>
